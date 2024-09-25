@@ -36,6 +36,7 @@ int main()
     std::cout << "Connected to the robot!" << std::endl;
 
     rtde_control.moveJ({A2R(-64),A2R(-90),A2R(-100),A2R(-45),A2R(90),0}); //Home Pos
+    rtde_control.moveL({-0.017, -0.577, 0.16, 0, 0, 0}); // Pos1
 
 
     // Define points
@@ -79,35 +80,38 @@ int main()
     Eigen::Vector4d P4_B = T_BH * P4_H;
 
 
-    //Draw square
-    for(int i = 0; i<3; ++i)
-    {
-        rtde_control.moveL({P1_B(0),P1_B(1),P1_B(2), A2R(25), A2R(-180),0});
-        rtde_control.moveL({P2_B(0),P2_B(1),P2_B(2), A2R(25), A2R(-180),0});
-        rtde_control.moveL({P3_B(0),P3_B(1),P3_B(2), A2R(25), A2R(-180),0});
-        rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), A2R(25), A2R(-180),0});
-    }
+    rtde_control.moveL({P1_B(0),P1_B(1),P1_B(2), 0, 0 ,0});
+    rtde_control.moveL({P1_B(0),P1_B(1),P1_B(2), M_PI, 0 , 0});
 
-    //Throw from current position
+//    //Draw square
+//    for(int i = 0; i<3; ++i)
+//    {
+//        rtde_control.moveL({P1_B(0),P1_B(1),P1_B(2), A2R(25), A2R(-180),0});
+//        rtde_control.moveL({P2_B(0),P2_B(1),P2_B(2), A2R(25), A2R(-180),0});
+//        rtde_control.moveL({P3_B(0),P3_B(1),P3_B(2), A2R(25), A2R(-180),0});
+//        rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), A2R(25), A2R(-180),0});
+//    }
 
-    rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), A2R(25), A2R(-180),0}); //Throw Pos
-    std::vector<double> throwPos = rtde_recv.getActualTCPPose();
-    Eigen::Vector4d QThrowPosB(throwPos[0], throwPos[1],throwPos[2], 0); //Get x, y, z
-    Eigen::Vector4d QThrowPosH = T_BH_INV * QThrowPosB; //Convert to Home-frame
+//    //Throw from current position
 
-    //Add add 20x20 cm to throw point in home-frame
-    QThrowPosH(0)+= 0.2;
-    QThrowPosH(2) += 0.2;
+//    rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), A2R(25), A2R(-180),0}); //Throw Pos
+//    std::vector<double> throwPos = rtde_recv.getActualTCPPose();
+//    Eigen::Vector4d QThrowPosB(throwPos[0], throwPos[1],throwPos[2], 0); //Get x, y, z
+//    Eigen::Vector4d QThrowPosH = T_BH_INV * QThrowPosB; //Convert to Home-frame
 
-    //Convert back to Base-frame
-    Eigen::Vector4d QThrowEndPosB = T_BH * QThrowPosH;
-    std::vector<double> throwEndPos = {QThrowEndPosB(0), QThrowEndPosB(1), QThrowEndPosB(2), throwPos[3], throwPos[4], throwPos[5]};
+//    //Add add 20x20 cm to throw point in home-frame
+//    QThrowPosH(0)+= 0.2;
+//    QThrowPosH(2) += 0.2;
 
-    rtde_control.moveL(throwEndPos, 1, calcMinAcc(1, throwPos, throwEndPos), true); //Throw the 20x20cm with 1 m/s. Acceleration required calculated from speed and distance (throwPos&EndPos)
-    while(!rtde_control.isSteady())
-    {
-        //Check when x pos > than 50% of xthrowPath x startspos -> Release
-    }
+//    //Convert back to Base-frame
+//    Eigen::Vector4d QThrowEndPosB = T_BH * QThrowPosH;
+//    std::vector<double> throwEndPos = {QThrowEndPosB(0), QThrowEndPosB(1), QThrowEndPosB(2), throwPos[3], throwPos[4], throwPos[5]};
+
+//    rtde_control.moveL(throwEndPos, 1, calcMinAcc(1, throwPos, throwEndPos), true); //Throw the 20x20cm with 1 m/s. Acceleration required calculated from speed and distance (throwPos&EndPos)
+//    while(!rtde_control.isSteady())
+//    {
+//        //Check when x pos > than 50% of xthrowPath x startspos -> Release
+//    }
 
 
 
