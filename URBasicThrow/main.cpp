@@ -1,3 +1,9 @@
+
+// ------------------------------- TCP --------------------------------
+#include <QCoreApplication>
+#include <QTcpSocket>
+#include <QtDebug>
+
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -15,7 +21,6 @@
 #include <Eigen/Geometry>   //Basic Transformation, 2D, 3D rotations
 #include <Eigen/LU>         //Inverse ect
 
-
 double A2R(double angle)
 {
     return angle*(M_PI/180);
@@ -31,8 +36,38 @@ double calcMinAcc(double speed, std::vector<double> throwPos,  std::vector<doubl
 
 int main()
 {
+    //-------------------------- Connect to gripper and home ----------------------
+    QTcpSocket socket;
+    socket.connectToHost("192.168.1.20", 1000);
+    if(!socket.waitForConnected(5000))
+    {
+        qDebug() << "Connection Failed: " << socket.errorString();
+    }
+
+    QString command = "home()\n";
+    socket.write(command.toUtf8()); //Send
+
+    if(!socket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
+    {
+        qDebug() << "Failed to send command, exiting: " << socket.errorString();
+        return 0;
+    }
+
+    if(!socket.waitForReadyRead(3000))
+        qDebug() << "Command not received: " << socket.errorString();
+
+    QByteArray response = socket.readLine(); //Command ACK
+
+    if(!socket.waitForReadyRead(5000))
+        qDebug() << "Command not done " << socket.errorString();
+    response = socket.readLine(); //Command Finished
+
+
+    // ------------------------ Connect to UR and run --------------------------------------
+
     std::string ip = "192.168.1.54"; //UR
     //std::string ip = "192.168.56.101"; //UR sim
+
     ur_rtde::RTDEControlInterface rtde_control(ip);
     ur_rtde::RTDEIOInterface rtde_IO(ip);
     ur_rtde::RTDEReceiveInterface rtde_recv(ip);
@@ -41,8 +76,31 @@ int main()
         std::cout << "Connected to the robot!" << std::endl;
 
 
+
+
+
     rtde_control.moveJ({A2R(-64),A2R(-90),A2R(-100),A2R(-45),A2R(90),0}); //Home Pos
-    rtde_control.moveL({-0.017, -0.577, 0.16, 0, M_PI, 0}); // Pos1
+
+    command = "grip()\n";
+    socket.write(command.toUtf8()); //SACK GRIP
+
+
+    if(!socket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
+    {
+        qDebug() << "Failed to send command, exiting: " << socket.errorString();
+        return 0;
+    }
+
+    if(!socket.waitForReadyRead(3000))
+        qDebug() << "Command not received: " << socket.errorString();
+
+    response = socket.readLine(); //Command ACK
+
+    if(!socket.waitForReadyRead(5000))
+        qDebug() << "Command not done " << socket.errorString();
+    response = socket.readLine(); //Command Finished
+
+    //rtde_control.moveL({-0.017, -0.577, 0.16, 0, M_PI, 0}); // Pos1
 
 
     // Define points
@@ -97,30 +155,63 @@ int main()
 
 //    //Throw from current position
 
-    rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), A2R(25), A2R(-180), 0}); //Throw Pos
+    rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), 0.58, -3.146, 0.536}); //Throw Pos
 
     std::vector<double> throwPos = rtde_recv.getActualTCPPose();
     Eigen::Vector4d QThrowPosB(throwPos[0], throwPos[1],throwPos[2], 1); //Get x, y, z
     Eigen::Vector4d QThrowPosH = T_BH_INV * QThrowPosB; //Convert to Home-frame
 
     //Add add 20x20 cm to throw point in home-frame
-    QThrowPosH(0)+= 0.2;
-    QThrowPosH(2) += 0.2;
+    QThrowPosH(0)+= 0.25;
+    QThrowPosH(2) += 0.30;
 
     //Convert back to Base-frame
     Eigen::Vector4d QThrowEndPosB = T_BH * QThrowPosH;
     std::vector<double> throwEndPos = {QThrowEndPosB(0), QThrowEndPosB(1), QThrowEndPosB(2), throwPos[3], throwPos[4], throwPos[5]};
 
-    rtde_control.moveL(throwEndPos, 1, calcMinAcc(1, throwPos, throwEndPos), true); //Throw the 20x20cm with 1 m/s. Acceleration required calculated from speed and distance (throwPos&EndPos)
+    double dX = throwEndPos[0]-throwPos[0];
+    bool dXPositive = dX > 0;
+    double midX = throwPos[0]+(dX/2);
+
+
+    std::vector<double> currentPos;
+    rtde_control.moveL(throwEndPos, 1.2, calcMinAcc(1.5, throwPos, throwEndPos), true); //Throw the 20x20cm with 1 m/s. Acceleration required calculated from speed and distance (throwPos&EndPos)
+
+    std::vector<double> jointPositions = rtde_recv.getActualQ();
+    jointPositions[3] += M_PI/2;
+    rtde_control.moveJ(jointPositions, 3, 6);
+
     while(!rtde_control.isSteady())
     {
-        //Check when x pos <> than 50% of xthrowPath x startspos -> Release
+        currentPos = rtde_recv.getActualTCPPose();
+        if((dXPositive && currentPos[0] >= midX) || (!dXPositive && currentPos[0] <= midX))
+        {
+            command = "release(40,250)\n";
+            socket.write(command.toUtf8()); //SACK GRIP
+
+            if(!socket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
+            {
+                qDebug() << "Failed to send command, exiting: " << socket.errorString();
+                return 0;
+            }
+
+
+
+            //std::cout << rtde_recv.getActualTCPSpeed() << std::end;
+
+            if(!socket.waitForReadyRead(3000))
+                qDebug() << "Command not received: " << socket.errorString();
+
+            response = socket.readLine(); //Command ACK
+
+            if(!socket.waitForReadyRead(5000))
+                qDebug() << "Command not done " << socket.errorString();
+            response = socket.readLine(); //Command Finished
+            break;
+        }
     }
 
 
-
-
     std::cout << "Done" << std::endl;
-
     return 0;
 }
