@@ -34,20 +34,15 @@ int main()
     std::string ip = "192.168.1.54"; //UR
     //std::string ip = "192.168.56.101"; //UR sim
     ur_rtde::RTDEControlInterface rtde_control(ip);
+    rtde_control.setWatchdog(0.0083);
     ur_rtde::RTDEIOInterface rtde_IO(ip);
     ur_rtde::RTDEReceiveInterface rtde_recv(ip);
 
-    if(rtde_control.isConnected())
-        std::cout << "Connected to the robot!" << std::endl;
-
-
     rtde_control.moveJ({A2R(-64),A2R(-90),A2R(-100),A2R(-45),A2R(90),0}); //Home Pos
-    rtde_control.moveL({-0.017, -0.577, 0.16, 0, M_PI, 0}); // Pos1
-
 
     // Define points
-    double x1 = -0.017, y1 = -0.577, z1 = 0.160;
-    double x2 = 0.0257, y2 = -0.6803, z2 = 0.160;
+    double x1 = -0.07983, y1 = -0.46546, z1 = 0.160;
+    double x2 = 0.07224, y2 = -0.83567, z2 = 0.160;
 
     // Compute ux (vector from point 1 to point 2)
     Eigen::Vector3d ux(x2 - x1, y2 - y1, z2 - z1);
@@ -73,23 +68,25 @@ int main()
 
     Eigen::Matrix4d T_BH_INV = T_BH.inverse();
 
-    // Define the points in H-space
-    Eigen::Vector4d P1_H(0.0, 0.0, 0, 1);
-    Eigen::Vector4d P2_H(0.2, 0.0, 0, 1);
-    Eigen::Vector4d P3_H(0.2, 0.2, 0, 1);
-    Eigen::Vector4d P4_H(0.0, 0.2, 0, 1);
 
-    // Apply the transformation to the points
-    Eigen::Vector4d P1_B = T_BH * P1_H;
-    Eigen::Vector4d P2_B = T_BH * P2_H;
-    Eigen::Vector4d P3_B = T_BH * P3_H;
-    Eigen::Vector4d P4_B = T_BH * P4_H;
+    for(int y = 0; y < 10; ++y)
+    {
+        for(int x = 0; x < 10; ++x)
+        {
+            Eigen::Vector4d P_H(0.05*x-0.025, 0.05*y-0.025, 0, 1);  //Point int world coordinates
+            Eigen::Vector4d P_B = T_BH * P_H;          //Point in Robot coordinates
+            rtde_control.moveL({P_B(0),P_B(1),P_B(2), 0, A2R(-180),0});
+        }
+    }
 
 
+
+    return 0;
+/*
 //    //Draw square
 //    for(int i = 0; i<3; ++i)
 //    {
-//        rtde_control.moveL({P1_B(0),P1_B(1),P1_B(2), A2R(25), A2R(-180),0});
+//
 //        rtde_control.moveL({P2_B(0),P2_B(1),P2_B(2), A2R(25), A2R(-180),0});
 //        rtde_control.moveL({P3_B(0),P3_B(1),P3_B(2), A2R(25), A2R(-180),0});
 //        rtde_control.moveL({P4_B(0),P4_B(1),P4_B(2), A2R(25), A2R(-180),0});
@@ -121,6 +118,6 @@ int main()
 
 
     std::cout << "Done" << std::endl;
-
+*/
     return 0;
 }
