@@ -21,6 +21,11 @@ double A2R(double angle)
     return angle*(M_PI/180);
 }
 
+double R2A(double radian)
+{
+    return (radian*180)/M_PI;
+}
+
 int main()
 {
     std::string ip = "192.168.1.54"; //UR
@@ -30,7 +35,8 @@ int main()
     ur_rtde::RTDEIOInterface rtde_IO(ip);
     ur_rtde::RTDEReceiveInterface rtde_recv(ip);
 
-    rtde_control.moveJ({A2R(-64),A2R(-90),A2R(-100),A2R(-45),A2R(90),0}); //Home Pos
+
+    // ---------------------------------- Calculate Transformation Matrix ------------------------------------
 
     // Define points
     double x1 = -0.07983, y1 = -0.46546, z1 = 0.160;
@@ -60,19 +66,44 @@ int main()
 
     Eigen::Matrix4d T_BH_INV = T_BH.inverse();
 
-    std::cout << T_BH << std::endl;
 
-    /*
-    for(int y = 0; y < 10; ++y)
-    {
-        for(int x = 0; x < 10; ++x)
-        {
-            Eigen::Vector4d P_H(0.05*x-0.025, 0.05*y-0.025, 0, 1);  //Point int world coordinates
-            Eigen::Vector4d P_B = T_BH * P_H;          //Point in Robot coordinates
-            rtde_control.moveL({P_B(0),P_B(1),P_B(2), 0, A2R(-180),0});
-        }
-    }
-    */
+    // ---------------------------------- INIT -------------------------------------
+
+    //Calculate angle from rotation matrix ect.
+    Eigen::Vector3d x(1, 0, 0);
+    double initAngle = acos(x.dot(ux));
+    std::vector<double> currentJointPos, targetJointPos;
+
+    //Move to home position
+    Eigen::Vector4d P_H(0.0, 0.2, 0.2, 1);  //Point int world coordinates
+    Eigen::Vector4d P_B = T_BH * P_H;          //Point in Robot coordinates
+    rtde_control.moveL({P_B(0), P_B(1), P_B(2), 0, A2R(-180), 0});
+
+
+    // --------------------------------- Make new orientation for TCP --------------------
+
+    //Add angle-90degrees to tool-flange-joint & move
+    double targetAngle = A2R(-45); //x decrees
+    currentJointPos = rtde_recv.getActualQ();
+    targetJointPos = currentJointPos;
+    targetJointPos[5] = targetJointPos[5]+initAngle-M_PI/2+targetAngle;
+    rtde_control.moveJ(targetJointPos);
+
+    //Use tcpOri to orientate tcp
+    Eigen::Vector3d tcpOri;
+    tcpOri(0) = rtde_recv.getActualTCPPose()[3];
+    tcpOri(1) = rtde_recv.getActualTCPPose()[4];
+    tcpOri(2) = rtde_recv.getActualTCPPose()[5];
+
+
+
+    // ---------------------------------- PROGRAM ------------------------------------
+
+    Eigen::Vector4d P_H1(0.1, 0.2, 0, 1);  //Point int world coordinates
+    Eigen::Vector4d P_B1 = T_BH * P_H1;          //Point in Robot coordinates
+
+    rtde_control.moveL({P_B1(0),P_B1(1),P_B1(2), tcpOri(0), tcpOri(1), tcpOri(2)}); //Go to cordinates & align tcp 0degress
+
 
     return 0;
 }
