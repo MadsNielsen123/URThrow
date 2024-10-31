@@ -16,15 +16,16 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Core REQUIRED)
 
 # Pylon
 list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR} )
-find_package(Pylon)
+find_package(Pylon REQUIRED)
 include_directories(${Pylon_INCLUDE_DIRS})
 
 # OpenCV
-find_package( OpenCV REQUIRED )
+find_package(OpenCV REQUIRED )
 
 find_package(ur_rtde REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 add_executable(URVisionIntegration
   main.cpp
+  ur5.h ur5.cpp
 )
 target_link_libraries(URVisionIntegration Qt${QT_VERSION_MAJOR}::Core ${OpenCV_LIBS} ${Pylon_LIBRARIES} ur_rtde::rtde Eigen3::Eigen)
