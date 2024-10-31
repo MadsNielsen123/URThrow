@@ -229,26 +229,30 @@ std::vector<double> findBall()
 
                 //draw the bounding box
                 cv::rectangle(maskedImage, boundingBox, cv::Scalar(60, 255, 255), 2);
+                cv::rectangle(imgUndistorted, boundingBox, cv::Scalar(60, 255, 255), 2);
+
 
                 //define the center points of the bounding box
                 int centerX = boundingBox.x + boundingBox.width / 2;
                 int centerY = boundingBox.y + boundingBox.height / 2;
 
                 //draw a small circle on the center point
-                cv::circle(maskedImage, cv::Point(centerX, centerY), 5, cv::Scalar(60, 255, 255), -1);
+                cv::circle(imgUndistorted, cv::Point(centerX, centerY), 5, cv::Scalar(60, 255, 255), -1);
 
                 cv::Mat resizedImage;
 
                 //resize image to fit on monitor
-                cv::resize(maskedImage, resizedImage, maskedImage.size() / 2, cv::INTER_LINEAR);
+                cv::resize(imgUndistorted, resizedImage, maskedImage.size() / 2, cv::INTER_LINEAR);
+
 
                 //display image
                 cv::imshow("resized", resizedImage);
+                cv::waitKey(0);
 
                 //define hardcoded camera -> world transformation
-                cv::Matx33f H = cv::Matx33f(-0.1058731429056703, -0.01136285388352953, 120.5186046992974,
-                    1.688552128707462e-17, -0.117067944181413, 120.3458466184926,
-                    -3.892943794818235e-06, -0.0001923031532593975, 1);
+                cv::Matx33f H = cv::Matx33f    (8.791885239048835e-05, -0.1265589388129923, 112.6477076592656,
+                 -0.1267161859667859, 4.388964932825915e-05, 112.8546197541133,
+                 -5.023934422312653e-06, -2.507979961614809e-06, 1);
                 //indsæt de koordinater vi får fra billedgenkendelse i billed planet her? ------------------
 
 
@@ -302,12 +306,15 @@ int main()
 
     UR5 UR;
 
-    std::vector<double> ballCoordinates = findBall();
-    std::cout << "x: " << ballCoordinates[0] << " y:" << ballCoordinates[1] << std::endl;
-    UR.moveL(ballCoordinates[0], ballCoordinates[1], 0, 0);
+    UR.moveL(0, 0, 0, 0);
+    //std::vector<double> ballCoordinates = findBall();
+    //std::cout << "x: " << ballCoordinates[0]*0.01 << " y:" << ballCoordinates[1]*0.01 << std::endl;
+    //UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0, 0);
+    //cv::waitKey(0);
 
-//    UR.moveL(0, 0, 0, 0);
+//
 //    UR.moveL(0.2, 0, 0, 0);
+//    UR.moveL(0, 0, 0, 0);
 //    UR.moveL(0.2, 0.2, 0, 0);
 //    UR.moveL(0, 0.2, 0, 0);
 //    UR.moveL(0, 0, 0, 0);

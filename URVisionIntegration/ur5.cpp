@@ -67,15 +67,17 @@ Eigen::Matrix4d UR5::getT_World2TCP(double degrees) const
     Eigen::Matrix4d mT_WTCP = Eigen::Matrix4d::Zero();
     Eigen::Matrix3d RotX180, RotZ;
 
+    //Rotatate 180 around x
     RotX180 << 1,  0,  0,
                0, -1,  0,
                0,  0, -1;
 
+    //Rotate ~Degrees around Z
     RotZ << cos(A2R(degrees)), -sin(A2R(degrees)), 0,
             sin(A2R(degrees)),  cos(A2R(degrees)), 0,
             0,                  0,                 1;
 
-    //Fixed angle (rot TCP-frame around stationary W-frame) -> Rotate  180° around x, then ~° around z
+    //Fixed angle (rot TCP-frame around stationary W-frame)
     mT_WTCP.block<3, 3>(0, 0) = RotZ*RotX180; // Set top-left corner to 3x3 matrix
     mT_WTCP(3, 3) = 1;
 
@@ -84,22 +86,37 @@ Eigen::Matrix4d UR5::getT_World2TCP(double degrees) const
 
 void UR5::moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchonous)
 {
+    //Translation
     Eigen::Vector4d P_H(wX, wY, wZ, 1);         //Point int world coordinates
     Eigen::Vector4d P_B = mT_BW*mT_TFTCP * P_H; //Point in Robot coordinates
 
-    Eigen::Vector3d rotXYZ = getAngleBetweenFrames(mT_BW * getT_World2TCP(tcpAngle));
+    //Orientation
+    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(tcpAngle);
+    std::cout << T_BTCP << std::endl;
 
-    std::cout << rotXYZ << std::endl;
+    double theta = acos((T_BTCP(0,0)+T_BTCP(1,1)+T_BTCP(2,2)-1)/2);
+    std::cout << "between x: " << getAngleBetweenFrames(T_BTCP)(0) << std::endl;
+    std::cout << "between y: " << getAngleBetweenFrames(T_BTCP)(1) << std::endl;
+    std::cout << "between z: " << getAngleBetweenFrames(T_BTCP)(2) << std::endl;
+    std::cout << "theta: " << theta << std::endl;
 
-    //mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), rotXYZ(0), rotXYZ(1), rotXYZ(2)}, 0.25, 1.2, asynchonous);
-    mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), 0, A2R(-180), 0}, 0.25, 1.2, asynchonous); //Default TCP orientation for now
+    Eigen::Vector3d k;
+    k << T_BTCP(2,1)-T_BTCP(1,2),
+         T_BTCP(0,2)-T_BTCP(2,0),
+         T_BTCP(1,0)-T_BTCP(0,1);
+
+    k = 1.0/(2.0*sin(theta)) * k;
+
+    std::cout << "k:\n " << k.normalized() << std::endl;
+
+    mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), theta*k(0), theta*k(1), theta*k(2)}, 0.25, 1.2, asynchonous);
+
 }
 
 template <typename T>
 T clamp(T value, T min, T max) {
     return (value < min) ? min : (value > max ? max : value);
 }
-
 
 Eigen::Vector3d UR5::getAngleBetweenFrames(Eigen::Matrix4d transformationMatrix) const
 {
