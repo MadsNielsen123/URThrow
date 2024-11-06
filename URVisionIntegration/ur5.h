@@ -12,29 +12,41 @@
 #include <Eigen/Geometry>   //Basic Transformation, 2D, 3D rotations
 #include <Eigen/LU>         //Inverse ect
 
+// --------------------- Gripper TCP ---------------------------------
+#include <QCoreApplication>
+#include <QTcpSocket>
+#include <QtDebug>
+
 
 class UR5
 {
 public:
     UR5();
-    double A2R(double degrees) const;
-    double R2A(double radians) const;
+
+    double D2R(double degrees) const;
+    double R2D(double radians) const;
+
     void moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchonous = false);
+    void gripper_grip();
+    void gripper_release(unsigned int mm);
 
 private:
-    //std::string mIP = "192.168.1.54"; //UR
-    std::string mIP = "192.168.56.101"; //UR sim
+    // ---------- UR Connection/Control -----------
+    std::string mIP = "192.168.1.54"; //UR
+    //std::string mIP = "192.168.56.101"; //UR sim
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;
     ur_rtde::RTDEReceiveInterface mRTDE_recv;
 
-    //4x4 transformation matrixes
+    // ---------- 4x4 Transformation matrices -----------
     Eigen::Matrix4d mT_BW, mT_BW_INV;
     Eigen::Matrix4d mT_TFTCP, mT_TFTCP_INV;
     Eigen::Matrix4d getT_World2TCP(double degrees) const;
 
-    Eigen::Vector3d getAngleBetweenFrames(Eigen::Matrix4d transformationMatrix) const;
+    // ---------- Gripper Connection/Control -----------
+    QTcpSocket mGripperSocket;
+    bool mGripped = false;
 };
 
 #endif // UR5_H

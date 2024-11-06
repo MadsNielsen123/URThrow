@@ -1,4 +1,3 @@
-#include <QCoreApplication>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
@@ -306,18 +305,16 @@ int main()
 
     UR5 UR;
 
-    UR.moveL(0, 0, 0, 0);
     //std::vector<double> ballCoordinates = findBall();
     //std::cout << "x: " << ballCoordinates[0]*0.01 << " y:" << ballCoordinates[1]*0.01 << std::endl;
     //UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0, 0);
     //cv::waitKey(0);
 
-//
-//    UR.moveL(0.2, 0, 0, 0);
-//    UR.moveL(0, 0, 0, 0);
-//    UR.moveL(0.2, 0.2, 0, 0);
-//    UR.moveL(0, 0.2, 0, 0);
-//    UR.moveL(0, 0, 0, 0);
+    //X,Y,Z,TCPAngle
+    UR.moveL(0, 0, 0, 0);
+    UR.gripper_grip();
+    UR.moveL(0.2, 0.2, 0, -45);
+    UR.gripper_release(80);
 
     return 0;
 }
