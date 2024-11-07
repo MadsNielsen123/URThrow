@@ -11,13 +11,9 @@
 std::vector<double> findBall()
 {
     std::vector<double> coordinates;
-    //take at least one picture, maybe multiple
 
     int myExposure = 30000;
-
-    // The exit code of the sample application.
     int exitCode = 0;
-
     // Automagically call PylonInitialize and PylonTerminate to ensure the pylon runtime system
     // is initialized during the lifetime of this object.
     Pylon::PylonAutoInitTerm autoInitTerm;
@@ -25,7 +21,6 @@ std::vector<double> findBall()
     try
     {
         // Create an instant camera object with the camera device found first.
-
         Pylon::DeviceInfoList_t devices;
         Pylon::CTlFactory::GetInstance().EnumerateDevices(devices);
         if (devices.size() == 0) {
@@ -167,16 +162,6 @@ std::vector<double> findBall()
                 //cv::waitKey(0); // Wait for a key press to continue
 
 
-
-
-
-
-            // Create an OpenCV display window.
-                cv::namedWindow("myWindow", cv::WINDOW_NORMAL); // other options: CV_AUTOSIZE, CV_FREERATIO
-
-                // Display the current image in the OpenCV display window.
-                //cv::imshow("myWindow", openCvImage);
-
                 // Detect key press and quit if 'q' is pressed
                 int keyPressed = cv::waitKey(1);
                 if (keyPressed == 'q')
@@ -199,8 +184,8 @@ std::vector<double> findBall()
                 cv::cvtColor(imgUndistorted, HSVImage, cv::COLOR_BGR2HSV);
 
                 //define color mask thresholds
-                cv::Scalar lowVal(40, 128, 128);
-                cv::Scalar highVal(80, 255, 255);
+                cv::Scalar lowVal(15, 130, 100);
+                cv::Scalar highVal(30, 255, 255);
 
                 //set pixels in range to white, not to black
                 cv::inRange(HSVImage, lowVal, highVal, maskedImage);
@@ -249,9 +234,9 @@ std::vector<double> findBall()
                 cv::waitKey(0);
 
                 //define hardcoded camera -> world transformation
-                cv::Matx33f H = cv::Matx33f    (8.791885239048835e-05, -0.1265589388129923, 112.6477076592656,
-                 -0.1267161859667859, 4.388964932825915e-05, 112.8546197541133,
-                 -5.023934422312653e-06, -2.507979961614809e-06, 1);
+                cv::Matx33f H = cv::Matx33f(-0.008453171254899592, -0.1027136663102614, 100.4104391989221,
+                                             -0.1108970334507943, 1.095836764117068e-05, 100.503555926516,
+                                             -0.0002133131348338028, -1.340640846687117e-05, 1);
                 //indsæt de koordinater vi får fra billedgenkendelse i billed planet her? ------------------
 
 
@@ -304,17 +289,22 @@ int main()
 {
 
     UR5 UR;
+    UR.moveL(0, 0, 0, 0);
+    std::vector<double> ballCoordinates = findBall();
+    std::cout << "x: " << ballCoordinates[0]*0.01 << " y:" << ballCoordinates[1]*0.01 << std::endl;
+    UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0.2, 0);
+    UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0, 0);
+    UR.gripper_grip();
+    UR.moveL(0, 0, 0.2, 0);
+    UR.gripper_release(20);
 
-    //std::vector<double> ballCoordinates = findBall();
-    //std::cout << "x: " << ballCoordinates[0]*0.01 << " y:" << ballCoordinates[1]*0.01 << std::endl;
-    //UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0, 0);
-    //cv::waitKey(0);
+    cv::waitKey(0);
 
     //X,Y,Z,TCPAngle
-    UR.moveL(0, 0, 0, 0);
-    UR.gripper_grip();
-    UR.moveL(0.2, 0.2, 0, -45);
-    UR.gripper_release(80);
+//    UR.moveL(0, 0, 0, 0);
+//    UR.gripper_grip();
+//    UR.moveL(0.2, 0.2, 0, -45);
+//    UR.gripper_release(80);
 
     return 0;
 }

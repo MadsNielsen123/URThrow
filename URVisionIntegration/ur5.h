@@ -28,7 +28,7 @@ public:
 
     void moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchonous = false);
     void gripper_grip();
-    void gripper_release(unsigned int mm);
+    void gripper_release(unsigned int mm = 10);
 
 private:
     // ---------- UR Connection/Control -----------

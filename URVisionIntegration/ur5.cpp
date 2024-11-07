@@ -100,7 +100,10 @@ void UR5::moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchono
 
 void UR5::gripper_grip()
 {
+    if(mGripped)
+        return;
     mGripped = true;
+
     QByteArray response;
     QString command = "grip()\n";
 
@@ -124,10 +127,10 @@ void UR5::gripper_release(unsigned int mm)
 {
     if(!mGripped)
         return;
-    mGripped = !mGripped;
+    mGripped = false;
 
-    if(mm > 55)
-        mm = 55;
+    if(mm > 50)
+        mm = 50;
 
     QByteArray response;
     QString command = "release("+QString::number(mm)+",250)\n"; //Default Quick Speed 250
