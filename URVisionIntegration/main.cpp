@@ -15,7 +15,7 @@
 //object
 #define BALL 0
 #define TARGET 1
-
+/*
 cv::Mat takePicture()
 {
     int myExposure = 30000;
@@ -333,24 +333,27 @@ std::vector<double> findObject(cv::Mat& image, int method, int object)
     }
 
 }
-
+*/
 int main()
 {
 
     UR5 UR;
-    UR.moveL(0, 0, 0, 0);
+    std::vector<double> jPos = {0, M_PI/3,0 ,M_PI/4, M_PI/6.0, 0};
+    std::cout << UR.getJacobean(jPos) << std::endl;
 
-    cv::Mat img = takePicture();
-    std::vector<double> ballCoordinates = findObject(img, HOUGH, BALL);
-    std::cout << "x: " << ballCoordinates[0]*0.01 << " y:" << ballCoordinates[1]*0.01 << std::endl;
+//    UR.moveL(0, 0, 0, 0);
 
-    UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0.2, 0);
-    UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0, 0);
-    UR.gripper_grip();
-    UR.moveL(0, 0, 0.2, 0);
-    UR.gripper_release(20);
+//    cv::Mat img = takePicture();
+//    std::vector<double> ballCoordinates = findObject(img, HOUGH, BALL);
+//    std::cout << "x: " << ballCoordinates[0]*0.01 << " y:" << ballCoordinates[1]*0.01 << std::endl;
 
-    cv::waitKey(0);
+//    UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0.2, 0);
+//    UR.moveL(ballCoordinates[0]*0.01, ballCoordinates[1]*0.01, 0, 0);
+//    UR.gripper_grip();
+//    UR.moveL(0, 0, 0.2, 0);
+//    UR.gripper_release(20);
+
+//    cv::waitKey(0);
 
     //X,Y,Z,TCPAngle
 //    UR.moveL(0, 0, 0, 0);

@@ -3,7 +3,7 @@
 #include <chrono>
 #include <thread>
 
-UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
+UR5::UR5() //: mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 {
     // mRTDE_ctrl.setWatchdog(0.0043); //Acknowledge time for the robot (Frequency)
 
@@ -22,33 +22,35 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
     mT_BW_INV = mT_BW.inverse();
     mT_TFTCP_INV = mT_TFTCP.inverse();
 
-    //Initialize/Home gripper
-    mGripperSocket.connectToHost("192.168.1.20", 1000);
-    if(!mGripperSocket.waitForConnected(5000))
-    {
-        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-    }
 
-    QByteArray response;
-    QString command = "home()\n";
-    mGripperSocket.write(command.toUtf8()); //Send
 
-    if(!mGripperSocket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
-    {
-        qDebug() << "Failed to initialize gripper: " << mGripperSocket.errorString();
-    }
+    //    //Initialize/Home gripper
+    //    mGripperSocket.connectToHost("192.168.1.20", 1000);
+    //    if(!mGripperSocket.waitForConnected(5000))
+    //    {
+    //        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+    //    }
 
-    if(!mGripperSocket.waitForReadyRead(3000))
-            qDebug() << "Command not received: " << mGripperSocket.errorString();
+    //    QByteArray response;
+    //    QString command = "home()\n";
+    //    mGripperSocket.write(command.toUtf8()); //Send
 
-    response = mGripperSocket.readLine(); //Command ACK
+    //    if(!mGripperSocket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
+    //    {
+    //        qDebug() << "Failed to initialize gripper: " << mGripperSocket.errorString();
+    //    }
 
-    if(!mGripperSocket.waitForReadyRead(5000))
-        qDebug() << "Command not done " << mGripperSocket.errorString();
+    //    if(!mGripperSocket.waitForReadyRead(3000))
+    //            qDebug() << "Command not received: " << mGripperSocket.errorString();
 
-    response = mGripperSocket.readLine(); //Command Finished
+    //    response = mGripperSocket.readLine(); //Command ACK
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 0.5-second delay
+    //    if(!mGripperSocket.waitForReadyRead(5000))
+    //        qDebug() << "Command not done " << mGripperSocket.errorString();
+
+    //    response = mGripperSocket.readLine(); //Command Finished
+
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 0.5-second delay
 }
 
 double UR5::D2R(double degrees) const
@@ -58,6 +60,27 @@ double UR5::D2R(double degrees) const
 double UR5::R2D(double radians) const
 {
     return (radians*180)/M_PI;
+}
+
+Eigen::Matrix<double, 6, 6> UR5::getJacobean(std::vector<double> jointPos) const
+{
+    double q1 = jointPos[0];
+    double q2 = jointPos[1];
+    double q3 = jointPos[2];
+    double q4 = jointPos[3];
+    double q5 = jointPos[4];
+    double q6 = jointPos[5];
+
+   Eigen::Matrix<double, 6, 6> J;
+
+   J << ((273.0*cos(q1))/2500.0 + (3223.0*cos(q1)*cos(q5))/10000.0 + (17.0*cos(q2)*sin(q1))/40.0 - (947.0*cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 + (947.0*sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0 - (3223.0*sin(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))))/10000.0 - (49.0*sin(q1)*sin(q2)*sin(q3))/125.0 + (49.0*cos(q2)*cos(q3)*sin(q1))/125.0), ((17.0*cos(q1)*sin(q2))/40.0 + (947.0*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (947*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000.0 + (49.0*cos(q1)*cos(q2)*sin(q3))/125.0 + (49.0*cos(q1)*cos(q3)*sin(q2))/125.0), ((947.0*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (947.0*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000.0 + (49.0*cos(q1)*cos(q2)*sin(q3))/125.0 + (49.0*cos(q1)*cos(q3)*sin(q2))/125.0), ((947.0*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (947.0*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000.0), (- (3223.0*sin(q1)*sin(q5))/10000.0 - (3223.0*cos(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))))/10000.0), 0,
+        ((273.0*sin(q1))/2500.0 - (17.0*cos(q1)*cos(q2))/40.0 + (3223.0*cos(q5)*sin(q1))/10000.0 + (947.0*cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (947.0*sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))))/10000.0 - (49.0*cos(q1)*cos(q2)*cos(q3))/125.0 + (49.0*cos(q1)*sin(q2)*sin(q3))/125.0), ((17.0*sin(q1)*sin(q2))/40.0 - (947.0*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0 - (947*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000.0 + (49.0*cos(q2)*sin(q1)*sin(q3))/125.0 + (49.0*cos(q3)*sin(q1)*sin(q2))/125.0), ((3223.0*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000.0 - (947.0*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 - (947.0*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0 + (49.0*cos(q2)*sin(q1)*sin(q3))/125.0 + (49.0*cos(q3)*sin(q1)*sin(q2))/125.0), ((3223.0*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000.0 - (947.0*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 - (947*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0)  , ((3223.0*cos(q1)*sin(q5))/10000.0 + (3223.0*cos(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))))/10000.0)  , 0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 0, ((49.0*sin(q2)*sin(q3))/125.0 - (49.0*cos(q2)*cos(q3))/125.0 - (17.0*cos(q2))/40.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000.0 + (947.0*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000.0 + (947.0*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000.0)                                                                                      , ((49.0*sin(q2)*sin(q3))/125.0 - (49.0*cos(q2)*cos(q3))/125.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000.0 + (947.0*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000.0 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000.0)                                                                                  , ((947.0*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000.0 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000.0)                                                                  , (-(3223.0*cos(q5)*(cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) + sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3))))/10000.0)                                                                    , 0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 0,                                                                                                                                                                                                                                                                                                                                                                                                                      sin(q1),                                                                                                                                                                                                                                                                                                                                                                                          sin(q1),                                                                                                                                                                                                                                                                                                            sin(q1), ((cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))                                                              , cos(q5)*sin(q1) - sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 0,                                                                                                                                                                                                                                                                                                                                                                                                                     -cos(q1),                                                                                                                                                                                                                                                                                                                                                                                         -cos(q1),                                                                                                                                                                                                                                                                                                           -cos(q1), (cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))                                                                , sin(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))) - cos(q1)*cos(q5),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 1,                                                                                                                                                                                                                                                                                                                                                                                                                            0,                                                                                                                                                                                                                                                                                                                                                                                                0,                                                                                                                                                                                                                                                                                                                  0, (sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) - cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))                                                                                                , -sin(q5)*(cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) + sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)));
+
+   return J;
 }
 
 Eigen::Matrix4d UR5::getT_World2TCP(double degrees) const
@@ -94,7 +117,7 @@ void UR5::moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchono
     Eigen::Vector3d axis = angleAxis.axis();
 
     //MoveL
-    mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), axis(0)*angleAxis.angle(), axis(1)*angleAxis.angle(), axis(2)*angleAxis.angle()}, 0.25, 1.2, asynchonous);
+    //mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), axis(0)*angleAxis.angle(), axis(1)*angleAxis.angle(), axis(2)*angleAxis.angle()}, 0.25, 1.2, asynchonous);
 
 }
 
@@ -150,7 +173,10 @@ void UR5::gripper_release(unsigned int mm)
     response = mGripperSocket.readLine(); //Command Finished
 }
 
+void UR5::throwFrom(std::vector<double> throwJointPos, Eigen::Vector3d throwSpeed, double T)
+{
 
+}
 
 
 
