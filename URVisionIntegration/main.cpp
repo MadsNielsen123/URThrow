@@ -338,8 +338,13 @@ int main()
 {
 
     UR5 UR;
-    std::vector<double> jPos = {0, M_PI/3,0 ,M_PI/4, M_PI/6.0, 0};
-    std::cout << UR.getJacobean(jPos) << std::endl;
+    Eigen::Vector3d throwCordsW;
+    throwCordsW << 0.3, 0.3, 0.3;
+    Eigen::Vector3d throwSpeed;
+    throwSpeed << 1,0,4;
+    Eigen::Vector3d startCordsW;
+    startCordsW << 0.0, 0.3, 0.0;
+    UR.throwFixed(throwCordsW, throwSpeed, startCordsW);
 
 //    UR.moveL(0, 0, 0, 0);
 

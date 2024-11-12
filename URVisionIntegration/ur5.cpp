@@ -3,7 +3,7 @@
 #include <chrono>
 #include <thread>
 
-UR5::UR5() //: mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
+UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 {
     // mRTDE_ctrl.setWatchdog(0.0043); //Acknowledge time for the robot (Frequency)
 
@@ -62,6 +62,29 @@ double UR5::R2D(double radians) const
     return (radians*180)/M_PI;
 }
 
+Eigen::Vector3d UR5::world2baseCords(Eigen::Vector3d worldCords) const
+{
+    // Convert 3D coordinates to 4D homogeneous coordinates
+    Eigen::Vector4d worldCordsHomo;
+    worldCordsHomo << worldCords, 1.0;
+
+    // Apply the transformations
+    Eigen::Vector4d baseCordsHomo = mT_BW * mT_TFTCP * worldCordsHomo;
+
+    // Convert back to 3D by dividing by the homogeneous coordinate
+    return baseCordsHomo.head<3>() / baseCordsHomo.w();
+}
+
+Eigen::Vector3d UR5::base2worldCords(Eigen::Vector3d baseCords) const
+{
+    Eigen::Vector4d baseCordsHomo;
+    baseCordsHomo << baseCords, 1.0;
+    Eigen::Vector4d worldCordsHomo = mT_BW * mT_TFTCP * baseCordsHomo;
+
+    return worldCordsHomo.head<3>() / worldCordsHomo.w();
+}
+
+
 Eigen::Matrix<double, 6, 6> UR5::getJacobean(std::vector<double> jointPos) const
 {
     double q1 = jointPos[0];
@@ -73,12 +96,14 @@ Eigen::Matrix<double, 6, 6> UR5::getJacobean(std::vector<double> jointPos) const
 
    Eigen::Matrix<double, 6, 6> J;
 
-   J << ((273.0*cos(q1))/2500.0 + (3223.0*cos(q1)*cos(q5))/10000.0 + (17.0*cos(q2)*sin(q1))/40.0 - (947.0*cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 + (947.0*sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0 - (3223.0*sin(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))))/10000.0 - (49.0*sin(q1)*sin(q2)*sin(q3))/125.0 + (49.0*cos(q2)*cos(q3)*sin(q1))/125.0), ((17.0*cos(q1)*sin(q2))/40.0 + (947.0*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (947*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000.0 + (49.0*cos(q1)*cos(q2)*sin(q3))/125.0 + (49.0*cos(q1)*cos(q3)*sin(q2))/125.0), ((947.0*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (947.0*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000.0 + (49.0*cos(q1)*cos(q2)*sin(q3))/125.0 + (49.0*cos(q1)*cos(q3)*sin(q2))/125.0), ((947.0*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (947.0*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000.0), (- (3223.0*sin(q1)*sin(q5))/10000.0 - (3223.0*cos(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))))/10000.0), 0,
-        ((273.0*sin(q1))/2500.0 - (17.0*cos(q1)*cos(q2))/40.0 + (3223.0*cos(q5)*sin(q1))/10000.0 + (947.0*cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000.0 + (947.0*sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))))/10000.0 - (49.0*cos(q1)*cos(q2)*cos(q3))/125.0 + (49.0*cos(q1)*sin(q2)*sin(q3))/125.0), ((17.0*sin(q1)*sin(q2))/40.0 - (947.0*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0 - (947*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 + (3223.0*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000.0 + (49.0*cos(q2)*sin(q1)*sin(q3))/125.0 + (49.0*cos(q3)*sin(q1)*sin(q2))/125.0), ((3223.0*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000.0 - (947.0*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 - (947.0*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0 + (49.0*cos(q2)*sin(q1)*sin(q3))/125.0 + (49.0*cos(q3)*sin(q1)*sin(q2))/125.0), ((3223.0*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000.0 - (947.0*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000.0 - (947*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000.0)  , ((3223.0*cos(q1)*sin(q5))/10000.0 + (3223.0*cos(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))))/10000.0)  , 0,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 0, ((49.0*sin(q2)*sin(q3))/125.0 - (49.0*cos(q2)*cos(q3))/125.0 - (17.0*cos(q2))/40.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000.0 + (947.0*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000.0 + (947.0*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000.0)                                                                                      , ((49.0*sin(q2)*sin(q3))/125.0 - (49.0*cos(q2)*cos(q3))/125.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000.0 + (947.0*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000.0 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000.0)                                                                                  , ((947.0*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000.0 - (3223.0*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000.0 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000.0)                                                                  , (-(3223.0*cos(q5)*(cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) + sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3))))/10000.0)                                                                    , 0,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 0,                                                                                                                                                                                                                                                                                                                                                                                                                      sin(q1),                                                                                                                                                                                                                                                                                                                                                                                          sin(q1),                                                                                                                                                                                                                                                                                                            sin(q1), ((cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))                                                              , cos(q5)*sin(q1) - sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))),
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 0,                                                                                                                                                                                                                                                                                                                                                                                                                     -cos(q1),                                                                                                                                                                                                                                                                                                                                                                                         -cos(q1),                                                                                                                                                                                                                                                                                                           -cos(q1), (cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))                                                                , sin(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))) - cos(q1)*cos(q5),
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 1,                                                                                                                                                                                                                                                                                                                                                                                                                            0,                                                                                                                                                                                                                                                                                                                                                                                                0,                                                                                                                                                                                                                                                                                                                  0, (sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) - cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))                                                                                                , -sin(q5)*(cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) + sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)));
+   J << (273*cos(q1))/2500 + (823*cos(q1)*cos(q5))/10000 + (17*cos(q2)*sin(q1))/40 - (947*cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000 + (947*sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000 - (823*sin(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))))/10000 - (49*sin(q1)*sin(q2)*sin(q3))/125 + (49*cos(q2)*cos(q3)*sin(q1))/125, (17*cos(q1)*sin(q2))/40 + (947*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000 - (947*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000 + (823*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000 + (49*cos(q1)*cos(q2)*sin(q3))/125 + (49*cos(q1)*cos(q3)*sin(q2))/125, (947*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000 - (947*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000 + (823*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000 + (49*cos(q1)*cos(q2)*sin(q3))/125 + (49*cos(q1)*cos(q3)*sin(q2))/125, (947*cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000 - (947*sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000 + (823*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3))))/10000, - (823*sin(q1)*sin(q5))/10000 - (823*cos(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))))/10000,                                                                                                                                                     0,
+        (273*sin(q1))/2500 - (17*cos(q1)*cos(q2))/40 + (823*cos(q5)*sin(q1))/10000 + (947*cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)))/10000 + (947*sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)))/10000 - (823*sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))))/10000 - (49*cos(q1)*cos(q2)*cos(q3))/125 + (49*cos(q1)*sin(q2)*sin(q3))/125, (17*sin(q1)*sin(q2))/40 - (947*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000 - (947*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000 + (823*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000 + (49*cos(q2)*sin(q1)*sin(q3))/125 + (49*cos(q3)*sin(q1)*sin(q2))/125, (823*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000 - (947*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000 - (947*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000 + (49*cos(q2)*sin(q1)*sin(q3))/125 + (49*cos(q3)*sin(q1)*sin(q2))/125, (823*sin(q5)*(cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1))))/10000 - (947*sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)))/10000 - (947*cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)))/10000,   (823*cos(q1)*sin(q5))/10000 + (823*cos(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))))/10000,                                                                                                                                                     0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             0,                                                                                         (49*sin(q2)*sin(q3))/125 - (49*cos(q2)*cos(q3))/125 - (17*cos(q2))/40 - (823*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000 + (947*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000,                                                                                 (49*sin(q2)*sin(q3))/125 - (49*cos(q2)*cos(q3))/125 - (823*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000 + (947*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000,                                                                 (947*cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)))/10000 - (823*sin(q5)*(cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)) - sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2))))/10000 + (947*sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)))/10000,                                                                -(823*cos(q5)*(cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) + sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3))))/10000,                                                                                                                                                     0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             0,                                                                                                                                                                                                                                                                                                                                                                                             sin(q1),                                                                                                                                                                                                                                                                                                                                                                   sin(q1),                                                                                                                                                                                                                                                                                             sin(q1),                                                       cos(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2)) + sin(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)), cos(q5)*sin(q1) - sin(q5)*(cos(q4)*(cos(q1)*cos(q2)*cos(q3) - cos(q1)*sin(q2)*sin(q3)) - sin(q4)*(cos(q1)*cos(q2)*sin(q3) + cos(q1)*cos(q3)*sin(q2))),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             0,                                                                                                                                                                                                                                                                                                                                                                                            -cos(q1),                                                                                                                                                                                                                                                                                                                                                                  -cos(q1),                                                                                                                                                                                                                                                                                            -cos(q1),                                                       cos(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - sin(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)), sin(q5)*(cos(q4)*(sin(q1)*sin(q2)*sin(q3) - cos(q2)*cos(q3)*sin(q1)) + sin(q4)*(cos(q2)*sin(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2))) - cos(q1)*cos(q5),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             1,                                                                                                                                                                                                                                                                                                                                                                                                   0,                                                                                                                                                                                                                                                                                                                                                                         0,                                                                                                                                                                                                                                                                                                   0,                                                                                       sin(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) - cos(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)),                                                  -sin(q5)*(cos(q4)*(cos(q2)*sin(q3) + cos(q3)*sin(q2)) + sin(q4)*(cos(q2)*cos(q3) - sin(q2)*sin(q3)));
+
+   J = J.unaryExpr([&](double val) { return std::abs(val) < (1e-15) ? 0.0 : val; }); //Round the small values (presition errors) down to 0
 
    return J;
 }
@@ -117,7 +142,7 @@ void UR5::moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchono
     Eigen::Vector3d axis = angleAxis.axis();
 
     //MoveL
-    //mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), axis(0)*angleAxis.angle(), axis(1)*angleAxis.angle(), axis(2)*angleAxis.angle()}, 0.25, 1.2, asynchonous);
+    mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), axis(0)*angleAxis.angle(), axis(1)*angleAxis.angle(), axis(2)*angleAxis.angle()}, 0.25, 1.2, asynchonous);
 
 }
 
@@ -173,8 +198,94 @@ void UR5::gripper_release(unsigned int mm)
     response = mGripperSocket.readLine(); //Command Finished
 }
 
-void UR5::throwFrom(std::vector<double> throwJointPos, Eigen::Vector3d throwSpeed, double T)
+void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Eigen::Vector3d startCordsW)
 {
+    Eigen::Vector3d pathVector = (throwCordsW-startCordsW);
+    double angle = acos(pathVector(0)/sqrt(pow(pathVector(0),2)+pow(pathVector(1),2)));
+
+    //Convert to base cordiantes -translation-
+    Eigen::Vector3d throwCordsB = world2baseCords(throwCordsW);
+    Eigen::Vector3d startCordsB = world2baseCords(startCordsW);
+    std::vector<double> wThrowPos = {throwCordsB(0), throwCordsB(1), throwCordsB(2)};
+    std::vector<double> wStartPos = {startCordsB(0), startCordsB(1), startCordsB(2)};
+
+    //Convert to base cordiantes -orientation-
+    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(angle-90);
+    Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
+    Eigen::Vector3d axis = angleAxis.axis();
+    wThrowPos.push_back(axis(0)*angleAxis.angle()); wThrowPos.push_back(axis(1)*angleAxis.angle()); wThrowPos.push_back(axis(2)*angleAxis.angle());
+    wStartPos.push_back(axis(0)*angleAxis.angle()); wStartPos.push_back(axis(1)*angleAxis.angle()); wStartPos.push_back(axis(2)*angleAxis.angle());
+
+
+    //Calculate joint positions
+    std::vector<double> jThrowPos, jStartPos;
+    jThrowPos = mRTDE_ctrl.getInverseKinematics(wThrowPos);
+    jStartPos = mRTDE_ctrl.getInverseKinematics(wStartPos);
+
+
+    // Extract positional part of the Jacobian (3x6)
+    Eigen::Matrix<double, 3, 6> positionalJacobian = getJacobean(jThrowPos).topRows(3);
+
+    // Compute the pseudoinverse of the positional part
+    Eigen::MatrixXd pseudoinverse = positionalJacobian.transpose() * (positionalJacobian * positionalJacobian.transpose()).inverse();
+
+    // Compute joint speeds
+    Eigen::VectorXd throwJointSpeeds = pseudoinverse * throwSpeed;
+
+    std::cout << "speeds:\n" << throwJointSpeeds << std::endl;
+
+
+    double T = 0;
+
+//    //Calculate smalest T (from slowest link)
+//    for(int i = 0; i<6; ++i)
+//    {   if(throwJointSpeeds[i] != 0)
+//        {
+//            double TJ = std::abs((2*(jThrowPos[i]-jStartPos[i]))/throwJointSpeeds[i]); //Minimum time T to reach joint speed for the throw (with linear acceleration and the exact joint-distance)
+//            if(TJ > T)
+//                T = TJ;
+//        }
+//    }
+
+    T = 2;
+    std::cout << "T: " << T << std::endl;
+
+    //Calcualte accelrations
+    Eigen::VectorXd jointAccelerations(6);
+    for(int i = 0; i<6; ++i)
+    {
+        jointAccelerations[i] = throwJointSpeeds[i]/T;
+    }
+    std::cout << "accelerations:\n" << jointAccelerations << std::endl;
+    //Move to start position
+    mRTDE_ctrl.moveJ(jStartPos);
+
+    //Start the throw
+    std::chrono::system_clock::time_point currentTime;
+    std::chrono::duration<double> interval(0.020); // 8 milliseconds -> 125Hz
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+    auto lastCommandTime = startTime;
+
+    while(true)
+    {
+        currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> t = currentTime-startTime;
+
+        //Send speedJ commands with 125Hz
+        if(currentTime - lastCommandTime >= interval)
+        {
+
+            mRTDE_ctrl.speedJ({jointAccelerations[0]*t.count(), jointAccelerations[1]*t.count(), jointAccelerations[2]*t.count(), jointAccelerations[3]*t.count(), jointAccelerations[4]*t.count(), jointAccelerations[5]*t.count()},10); //Set joints speeds from acceleration * time. (Acceleration limit set to 10)
+            lastCommandTime = currentTime;
+        }
+
+        //End Throw
+        if(t.count() >= T-0)
+            break;
+    }
+
+    mRTDE_ctrl.speedStop();
 
 }
 

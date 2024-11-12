@@ -25,6 +25,8 @@ public:
 
     double D2R(double degrees) const;
     double R2D(double radians) const;
+    Eigen::Vector3d world2baseCords(Eigen::Vector3d worldCords) const;
+    Eigen::Vector3d base2worldCords(Eigen::Vector3d baseCords) const;
 
     //Jacobean
     Eigen::Matrix<double, 6, 6> getJacobean(std::vector<double> jointPos) const;
@@ -34,16 +36,16 @@ public:
     void gripper_release(unsigned int mm = 10);
 
     //Parameters: worldThrowPos, throwSpeed (from that pos) & T (Time to accelerate) ... *Method backtracks throw*
-    void throwFrom(std::vector<double> wThrowPos, Eigen::Vector3d throwSpeed, double T);
+    void throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Eigen::Vector3d startCordsW);
 
 private:
     // ---------- UR Connection/Control -----------
-    std::string mIP = "192.168.1.54"; //UR
-    //std::string mIP = "192.168.56.101"; //UR sim
+    //std::string mIP = "192.168.1.54"; //UR
+    std::string mIP = "192.168.0.26"; //UR sim
 
-    //ur_rtde::RTDEControlInterface mRTDE_ctrl;
-    //ur_rtde::RTDEIOInterface mRTDE_IO;
-    //ur_rtde::RTDEReceiveInterface mRTDE_recv;
+    ur_rtde::RTDEControlInterface mRTDE_ctrl;
+    ur_rtde::RTDEIOInterface mRTDE_IO;
+    ur_rtde::RTDEReceiveInterface mRTDE_recv;
 
     // ---------- 4x4 Transformation matrices -----------
     Eigen::Matrix4d mT_BW, mT_BW_INV;
