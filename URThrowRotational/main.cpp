@@ -105,5 +105,38 @@ int main()
     rtde_control.moveL({P_B1(0),P_B1(1),P_B1(2), tcpOri(0), tcpOri(1), tcpOri(2)}); //Go to cordinates & align tcp 0degress
 
 
+
+
+ /*   
+//////////////////////////__________________________////////////////////////////////////
+     // Parameters
+ double acceleration = M_PI;
+ double dt = 1.0 / 125; // 8ms
+ 
+ std::vector<double> joint_speed = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+ // Move to initial joint position with a regular moveL
+  Eigen::Vector4d P_H(0.0, 0.2, 0.2, 1);  //Point int world coordinates
+    Eigen::Vector4d P_B = T_BH * P_H;          //Point in Robot coordinates
+    rtde_control.moveL({P_B(0), P_B(1), P_B(2), 0, A2R(-180), 0});
+
+ // Execute 125Hz control loop for 0,5 seconds, each cycle is ~8ms
+ for (unsigned int i = 0; i < 63; i++)
+ {
+     steady_clock::time_point t_start = rtde_control.initPeriod();
+     rtde_control.speedJ(joint_speed, acceleration, dt);
+     joint_speed[1] += 0.0005;
+     joint_speed[2] += 0,04704;
+     rtde_control.waitPeriod(t_start);
+ }
+
+ rtde_control.speedStop();
+ rtde_control.stopScript();
+*/
+
+
+
+    
+
     return 0;
 }
