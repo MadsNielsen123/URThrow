@@ -338,15 +338,18 @@ int main()
 {
 
     UR5 UR;
+    UR.moveL(0,0,0,0,45);
+
+    return 0;
     Eigen::Vector3d throwCordsW;
-    throwCordsW << 0.3, 0.3, 0.3;
+    throwCordsW << 0.4, 0.3, 0.1;
     double angle = UR.D2R(45);
-    double throwSpeed = 1; // 1m/s
+    double throwSpeed = 2; // 1m/s
     Eigen::Vector3d throwSpeedVec;
-    throwSpeedVec << cos(angle)*throwSpeed,0,sin(angle)*throwSpeed;
+    throwSpeedVec << cos(angle)*throwSpeed, 0, sin(angle)*throwSpeed;
     Eigen::Vector3d startCordsW;
     startCordsW << 0.0, 0.3, 0.0;
-    std::cout << "Throwspeed: " << throwSpeedVec << std::endl;
+
     UR.throwFixed(throwCordsW, throwSpeedVec, startCordsW);
     //UR.moveL(throwCordsW(0), throwCordsW(1), throwCordsW(2),0);
 //    UR.moveL(0, 0, 0, 0);

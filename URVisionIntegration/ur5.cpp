@@ -12,6 +12,7 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
             0.0005,  -0.0001,  1,      -0.0217,
             0,        0,       0,       1;
 
+    mR_BW = mT_BW.topLeftCorner(3, 3);
 
 
     mT_TFTCP << 1,  0,  0, 0,
@@ -51,6 +52,8 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
     //    response = mGripperSocket.readLine(); //Command Finished
 
     //    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 0.5-second delay
+
+    moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
 
 double UR5::D2R(double degrees) const
@@ -108,36 +111,46 @@ Eigen::Matrix<double, 6, 6> UR5::getJacobean(std::vector<double> jointPos) const
    return J;
 }
 
-Eigen::Matrix4d UR5::getT_World2TCP(double degrees) const
+Eigen::Matrix4d UR5::getT_World2TCP(double degreesZ, double degreesX) const
 {
     Eigen::Matrix4d T_WTCP = Eigen::Matrix4d::Zero();
-    Eigen::Matrix3d RotX180, RotZ;
+    Eigen::Matrix3d RotX180, RotX, RotZ;
 
     //Rotatate 180 around x
     RotX180 << 1,  0,  0,
                0, -1,  0,
                0,  0, -1;
 
+    //Rotate ~Degrees around X
+    RotX << 1,                  0,                   0,
+               0, cos(D2R(degreesX)), -sin(D2R(degreesX)),
+               0, sin(D2R(degreesX)),  cos(D2R(degreesX));
+
     //Rotate ~Degrees around Z
-    RotZ << cos(D2R(degrees)), -sin(D2R(degrees)), 0,
-            sin(D2R(degrees)),  cos(D2R(degrees)), 0,
+    RotZ << cos(D2R(degreesZ)), -sin(D2R(degreesZ)), 0,
+            sin(D2R(degreesZ)),  cos(D2R(degreesZ)), 0,
             0,                  0,                 1;
 
     //Fixed angle (rot TCP-frame around stationary W-frame)
-    T_WTCP.block<3, 3>(0, 0) = RotZ*RotX180; // Set top-left corner to 3x3 matrix
+    T_WTCP.block<3, 3>(0, 0) = RotZ*RotX*RotX180; // Set top-left corner to 3x3 matrix
     T_WTCP(3, 3) = 1;
 
     return T_WTCP;
 }
 
-void UR5::moveL(double wX, double wY, double wZ, double tcpAngle, bool asynchonous)
+void UR5::moveJ(std::vector<double> jointPos)
+{
+    mRTDE_ctrl.moveJ(jointPos);
+}
+
+void UR5::moveL(double wX, double wY, double wZ, double tcpAngleZ, double tcpAngleX, bool asynchonous)
 {
     //Translation
     Eigen::Vector4d P_H(wX, wY, wZ, 1);         //Point int world coordinates
     Eigen::Vector4d P_B = mT_BW*mT_TFTCP * P_H; //Point in Robot coordinates
 
     //Orientation
-    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(tcpAngle-90);
+    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(tcpAngleZ-90, tcpAngleX);
     Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
     Eigen::Vector3d axis = angleAxis.axis();
 
@@ -198,10 +211,11 @@ void UR5::gripper_release(unsigned int mm)
     response = mGripperSocket.readLine(); //Command Finished
 }
 
-void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Eigen::Vector3d startCordsW)
+void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, Eigen::Vector3d startCordsW)
 {
-    Eigen::Vector3d pathVector = (throwCordsW-startCordsW);
-    double angle = acos(pathVector(0)/sqrt(pow(pathVector(0),2)+pow(pathVector(1),2)));
+
+    std::cout << "Throwspeed: \n" << mR_BW * throwSpeedW << std::endl;
+
 
     //Convert to base cordiantes -translation-
     Eigen::Vector3d throwCordsB = world2baseCords(throwCordsW);
@@ -210,7 +224,9 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
     std::vector<double> bStartPos = {startCordsB(0), startCordsB(1), startCordsB(2)};
 
     //Convert to base cordiantes -orientation-
-    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(angle-90);
+    Eigen::Vector3d pathVector = (throwCordsW-startCordsW);
+    double angle = acos(pathVector(0)/sqrt(pow(pathVector(0),2)+pow(pathVector(1),2)));
+    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(angle-90,45);
     Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
     Eigen::Vector3d axis = angleAxis.axis();
     bThrowPos.push_back(axis(0)*angleAxis.angle()); bThrowPos.push_back(axis(1)*angleAxis.angle()); bThrowPos.push_back(axis(2)*angleAxis.angle());
@@ -228,7 +244,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
     std::cout << "ThrowPos: \n";
     for(int i = 0; i<6; i++)
     {
-        std::cout << jThrowPos[i];
+        std::cout  << jThrowPos[i] << ", ";
     }
     std::cout << std::endl;
     std::cout << "positionalJacobian:\n " << positionalJacobian << std::endl;
@@ -239,18 +255,19 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
     std::cout << "pseudoinverse:\n " << pseudoinverse << std::endl;
 
     // Compute joint speeds
-    Eigen::VectorXd throwJointSpeeds = pseudoinverse * throwSpeed;
+    Eigen::VectorXd throwJointSpeeds = pseudoinverse * (mR_BW * throwSpeedW);
 
     std::cout << "speeds:\n" << throwJointSpeeds << std::endl;
 
 
     double T = 0;
 
-    //Calculate smalest T (from slowest link)
+    //Calculate smallest T (from slowest link)
     for(int i = 0; i<6; ++i)
     {   if(throwJointSpeeds[i] != 0)
-        {
-            double TJ = std::abs((2*(jThrowPos[i]-jStartPos[i]))/throwJointSpeeds[i]); //Minimum time T to reach joint speed for the throw (with linear acceleration and the exact joint-distance)
+        {            double TJ = std::abs((2*(jThrowPos[i]-jStartPos[i]))/throwJointSpeeds[i]); //Minimum time T to reach joint speed for the throw (with linear acceleration and the exact joint-distance)
+
+            //Save the largest
             if(TJ > T)
                 T = TJ;
         }
@@ -263,7 +280,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
     Eigen::VectorXd jointAccelerations(6);
     for(int i = 0; i<6; ++i)
     {
-        jointAccelerations[i] = throwJointSpeeds[i]/T;
+        jointAccelerations[i] = ((2*(jThrowPos[i]-jStartPos[i]))/(T*T));
     }
     std::cout << "accelerations:\n" << jointAccelerations << std::endl;
     //Move to start position
@@ -276,7 +293,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
 
     auto startTime = std::chrono::high_resolution_clock::now();
     auto lastCommandTime = startTime;
-    int yo = 0;
     while(true)
     {
         currentTime = std::chrono::high_resolution_clock::now();
@@ -285,10 +301,8 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
         //Send speedJ commands with 125Hz
         if(currentTime - lastCommandTime >= interval)
         {
-            yo++;
-            if(yo == 63)
-                std::cout << "J1 50%: " << jointAccelerations[0]*t.count() << std::endl;
-            mRTDE_ctrl.speedJ({jointAccelerations[0]*t.count(), jointAccelerations[1]*t.count(), jointAccelerations[2]*t.count(), jointAccelerations[3]*t.count(), jointAccelerations[4]*t.count(), jointAccelerations[5]*t.count()},10); //Set joints speeds from acceleration * time. (Acceleration limit set to 10)
+            //Set joints speeds from acceleration * time. (Acceleration limit: 10, stop time: 100ms)
+            mRTDE_ctrl.speedJ({jointAccelerations[0]*t.count(), jointAccelerations[1]*t.count(), jointAccelerations[2]*t.count(), jointAccelerations[3]*t.count(), jointAccelerations[4]*t.count(), jointAccelerations[5]*t.count()},10,0.1);
             lastCommandTime = currentTime;
 
         }
@@ -297,9 +311,8 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeed, Ei
         if(t.count() >= T)
             break;
     }
-    std::cout << "yo:" << yo << std::endl;
+    //Throw here (or a little earlier)
     mRTDE_ctrl.speedStop();
-
 }
 
 
