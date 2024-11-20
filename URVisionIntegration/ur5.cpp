@@ -25,33 +25,14 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 
-    //    //Initialize/Home gripper
-    //    mGripperSocket.connectToHost("192.168.1.20", 1000);
-    //    if(!mGripperSocket.waitForConnected(5000))
-    //    {
-    //        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-    //    }
+    //Initialize gripper
+    mGripperSocket.connectToHost("192.168.1.20", 1000);
+    if(!mGripperSocket.waitForConnected(5000))
+    {
+        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+    }
 
-    //    QByteArray response;
-    //    QString command = "home()\n";
-    //    mGripperSocket.write(command.toUtf8()); //Send
-
-    //    if(!mGripperSocket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
-    //    {
-    //        qDebug() << "Failed to initialize gripper: " << mGripperSocket.errorString();
-    //    }
-
-    //    if(!mGripperSocket.waitForReadyRead(3000))
-    //            qDebug() << "Command not received: " << mGripperSocket.errorString();
-
-    //    response = mGripperSocket.readLine(); //Command ACK
-
-    //    if(!mGripperSocket.waitForReadyRead(5000))
-    //        qDebug() << "Command not done " << mGripperSocket.errorString();
-
-    //    response = mGripperSocket.readLine(); //Command Finished
-
-    //    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 0.5-second delay
+    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -159,14 +140,12 @@ void UR5::moveL(double wX, double wY, double wZ, double tcpAngleZ, double tcpAng
 
 }
 
-void UR5::gripper_grip()
+void UR5::gripper_home()
 {
-    if(mGripped)
-        return;
-    mGripped = true;
+    mGripped = false;
 
     QByteArray response;
-    QString command = "grip()\n";
+    QString command = "home()\n"; //5N  , 45mm size
 
     mGripperSocket.write(command.toUtf8()); //Send command
 
@@ -184,7 +163,33 @@ void UR5::gripper_grip()
     response = mGripperSocket.readLine(); //Command Finished
 }
 
-void UR5::gripper_release(unsigned int mm)
+
+void UR5::gripper_gripBall()
+{
+    if(mGripped)
+        return;
+    mGripped = true;
+
+    QByteArray response;
+    QString command = "grip()\n"; //5N  , 45mm size
+
+    mGripperSocket.write(command.toUtf8()); //Send command
+
+    if(!mGripperSocket.waitForBytesWritten(3000)) //If hasn't been send in 3s -> failed
+        qDebug() << "Failed to send command, exiting: " << mGripperSocket.errorString();
+
+    if(!mGripperSocket.waitForReadyRead(3000))
+        qDebug() << "Command not received: " << mGripperSocket.errorString();
+
+    response = mGripperSocket.readLine(); //Command ACK
+
+    if(!mGripperSocket.waitForReadyRead(5000))
+        qDebug() << "Command not done " << mGripperSocket.errorString();
+
+    response = mGripperSocket.readLine(); //Command Finished
+}
+
+void UR5::gripper_releaseBall(double mm)
 {
     if(!mGripped)
         return;
@@ -214,8 +219,7 @@ void UR5::gripper_release(unsigned int mm)
 void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, Eigen::Vector3d startCordsW)
 {
 
-    std::cout << "Throwspeed: \n" << mR_BW * throwSpeedW << std::endl;
-
+    std::cout << "Throwspeed: \n" << throwSpeedW << std::endl;
 
     //Convert to base cordiantes -translation-
     Eigen::Vector3d throwCordsB = world2baseCords(throwCordsW);
@@ -225,8 +229,32 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
     //Convert to base cordiantes -orientation-
     Eigen::Vector3d pathVector = (throwCordsW-startCordsW);
-    double angle = acos(pathVector(0)/sqrt(pow(pathVector(0),2)+pow(pathVector(1),2)));
-    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(angle-90,45);
+
+    // Extract the x and y components of the vector
+    double x = pathVector.x();
+    double y = pathVector.y();
+
+    // Compute the magnitude of the vector in the x/y plane
+    double magnitude = std::sqrt(x * x + y * y);
+
+    // Compute the cosine of the angle with respect to the x-axis
+    double cosTheta = x / magnitude;
+
+
+    // Clamp the value to the range [-1, 1] to handle numerical precision issues
+    cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
+
+    // Compute the angle in radians
+    double angle = std::acos(cosTheta);
+
+    // Convert to degrees if needed (optional)
+    double angleDegrees = angle * (180.0 / M_PI);
+    Eigen::Matrix4d T_BTCP;
+    if(y>0)
+        T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,45);
+    else
+        T_BTCP = mT_BW*getT_World2TCP(-angleDegrees-90,45);
+
     Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
     Eigen::Vector3d axis = angleAxis.axis();
     bThrowPos.push_back(axis(0)*angleAxis.angle()); bThrowPos.push_back(axis(1)*angleAxis.angle()); bThrowPos.push_back(axis(2)*angleAxis.angle());
@@ -241,24 +269,15 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     // Extract positional part of the Jacobian (3x6)
     Eigen::Matrix<double, 3, 6> positionalJacobian = getJacobean(jThrowPos).topRows(3);
 
-    std::cout << "ThrowPos: \n";
-    for(int i = 0; i<6; i++)
-    {
-        std::cout  << jThrowPos[i] << ", ";
-    }
-    std::cout << std::endl;
-    std::cout << "positionalJacobian:\n " << positionalJacobian << std::endl;
-
     // Compute the pseudoinverse of the positional part
     Eigen::MatrixXd pseudoinverse = positionalJacobian.transpose() * (positionalJacobian * positionalJacobian.transpose()).inverse();
-
-    std::cout << "pseudoinverse:\n " << pseudoinverse << std::endl;
 
     // Compute joint speeds
     Eigen::VectorXd throwJointSpeeds = pseudoinverse * (mR_BW * throwSpeedW);
 
     std::cout << "speeds:\n" << throwJointSpeeds << std::endl;
-
+    mRTDE_ctrl.moveJ(jThrowPos);
+    mRTDE_ctrl.moveJ(jStartPos);
 
     double T = 0;
 
@@ -273,7 +292,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         }
     }
 
-    //T = 1;
+    T = 0.4;
     std::cout << "T: " << T << std::endl;
 
     //Calcualte accelrations
@@ -312,7 +331,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
             break;
     }
     //Throw here (or a little earlier)
-    mRTDE_ctrl.speedStop();
+    mRTDE_ctrl.speedStop(5);
 }
 
 

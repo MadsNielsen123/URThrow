@@ -32,17 +32,18 @@ public:
     Eigen::Matrix<double, 6, 6> getJacobean(std::vector<double> jointPos) const;
 
     void moveL(double wX, double wY, double wZ, double tcpAngleZ, double tcpAngleX, bool asynchonous = false);
+    void gripper_home();
     void moveJ(std::vector<double> jointPos);
-    void gripper_grip();
-    void gripper_release(unsigned int mm = 10);
+    void gripper_gripBall();
+    void gripper_releaseBall(double mm = 4);
 
     //Parameters: worldThrowPos, throwSpeed (from that pos) & T (Time to accelerate) ... *Method backtracks throw*
     void throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, Eigen::Vector3d startCordsW);
 
 private:
     // ---------- UR Connection/Control -----------
-    //std::string mIP = "192.168.1.54"; //UR
-    std::string mIP = "192.168.0.26"; //UR sim
+    std::string mIP = "192.168.1.54"; //UR
+    //std::string mIP = "192.168.56.101"; //UR sim
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;
