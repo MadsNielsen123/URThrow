@@ -7,6 +7,9 @@
 #include <cmath>
 #include <string>
 #include <ur5.h>
+#include <fstream>
+#include <chrono> // For timing
+#include <thread>
 
 //method
 #define COLORSEG 0
@@ -15,7 +18,7 @@
 //object
 #define BALL 0
 #define TARGET 1
-/*
+
 cv::Mat takePicture()
 {
     int myExposure = 30000;
@@ -38,6 +41,7 @@ cv::Mat takePicture()
             return imgUndistorted;
         }
 
+        std::cout << "Found " << devices.size() << " devices." << std::endl;
         Pylon::CInstantCamera camera(Pylon::CTlFactory::GetInstance().CreateDevice(devices[0]));
 
 
@@ -69,6 +73,7 @@ cv::Mat takePicture()
         GenApi::CEnumerationPtr exposureAuto(nodemap.GetNode("ExposureAuto"));
         if (GenApi::IsWritable(exposureAuto)) {
             exposureAuto->FromString("Off");
+            std::cout << "Exposure auto disabled." << std::endl;
         }
 
         // Set custom exposure
@@ -179,7 +184,7 @@ cv::Mat takePicture()
     }
 }
 
-std::vector<double> findObject(cv::Mat& image, int method, int object)
+std::vector<cv::Point2f> findObject(cv::Mat& image, int method = 1, int object = 0, int minRadiusBall = 14, int maxRadiusBall = 17, int minRadiusCup = 32, int maxRadiusCup = 40)
 {
 
 
@@ -256,7 +261,7 @@ std::vector<double> findObject(cv::Mat& image, int method, int object)
             << realWorldTransformedPoints[0].x << ", "
             << realWorldTransformedPoints[0].y << ")" << std::endl;
 
-        return { realWorldTransformedPoints[0].x, realWorldTransformedPoints[0].y };
+        return { { realWorldTransformedPoints[0].x, realWorldTransformedPoints[0].y } };
     }
     else if (method == HOUGH)
     {
@@ -272,9 +277,13 @@ std::vector<double> findObject(cv::Mat& image, int method, int object)
         std::vector<cv::Vec3f> circles;
         HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1,
             grayImage.rows / 16,  // change this value to detect circles with different distances to each other
-            100, 30, 14, 17 // change the last two parameters
+            100, 30, object ? minRadiusCup : minRadiusBall, object ? maxRadiusCup : maxRadiusBall // change the last two parameters
             // (min_radius & max_radius) to detect larger circles
         );
+        for (size_t i = 0; i < circles.size(); i++)
+        {
+
+        }
 
         for (size_t i = 0; i < circles.size(); i++)
         {
@@ -306,49 +315,113 @@ std::vector<double> findObject(cv::Mat& image, int method, int object)
         //average color value inside circle, grab the one closest to ping pong ball
 
         //consider covering holes for even symmetric smooth surface
-
-
-        //define center points under assumption of only one circle
-        double centerX = circles[object][0];
-        double centerY = circles[object][1];
-
-        // Now, we can use the homography matrix to transform a point.
-        //transform the center point previously found
-        cv::Point2f pixelPoint(centerX, centerY);
-
-        // Convert the point to homogeneous coordinates (add 1 to the point)
         std::vector<cv::Point2f> pixelPoints;
-        pixelPoints.push_back(pixelPoint);
-
         std::vector<cv::Point2f> realWorldTransformedPoints;
+        //double centerX = circles[0][0];
+        //double centerY = circles[0][1];
+        pixelPoints.emplace_back(circles[0][0], circles[0][1]);
 
-        // Apply the homography to the point
+        if(object == TARGET)
+        {
+            for (int i = 1; i < circles.size(); i++)
+            {
+                pixelPoints.emplace_back(circles[i][0], circles[i][1]);
+            }
+        }
         cv::perspectiveTransform(pixelPoints, realWorldTransformedPoints, H);
-        std::cout << "radius is: " << circles[object][2] << '\n';
-        //imshow("gray", grayImage);
-        cv::resize(image, image, image.size()/2, cv::INTER_LINEAR);
-        imshow("notGray", image);
-        //cv::waitKey(0);
-        return { realWorldTransformedPoints[0].x, realWorldTransformedPoints[0].y };
+        std::cout << "the smallest circle radius is: " << circles[0][2] << std::endl;
+        return realWorldTransformedPoints;
+
     }
 
 }
-*/
+
 int main()
 {
 
     UR5 UR;
-    UR.moveL(0,0,0,0,45);
+
+    // Create a vector to store the timings
+        std::vector<double> timings;
+
+    // Open a file to save the timings
+    std::ofstream outputFile("timings.txt");
+
+    if (!outputFile.is_open()) {
+        std::cerr << "Error opening file for writing!" << std::endl;
+        return 1;
+    }
+
+    for (int i = 0; i < 1; ++i) {
+        UR.moveL(0, 0, 0, 0, 0);
+        UR.gripper_gripBall();
+        UR.moveL(0, 0, 0.05, 0, 0);
+        UR.moveL(0.05, 0.05, 0.05, 0, 0);
+        UR.moveL(0.05, 0.05, 0.01, 0, 0);
+
+        // Start timer for gripper_releaseBall
+        auto startTime = std::chrono::high_resolution_clock::now();
+        UR.gripper_releaseBall();
+        auto endTime = std::chrono::high_resolution_clock::now();
+
+        // Calculate the duration in milliseconds
+        double elapsedTime = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+        timings.push_back(elapsedTime);
+
+        // Save the timing immediately
+        outputFile << elapsedTime << " ms" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        UR.gripper_home();
+        UR.moveL(0.05, 0.05, 0.005, 0, 0);
+        UR.gripper_gripBall();
+        UR.moveL(0.05, 0.05, 0.04, 0, 0);
+        UR.moveL(0, 0, 0.005, 0, 0);
+
+        // Start timer for second gripper_releaseBall
+        startTime = std::chrono::high_resolution_clock::now();
+        UR.gripper_releaseBall();
+        endTime = std::chrono::high_resolution_clock::now();
+
+        // Calculate the duration in milliseconds
+        elapsedTime = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+        timings.push_back(elapsedTime);
+
+        // Save the timing immediately
+        outputFile << elapsedTime << " ms" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        UR.gripper_home();
+    }
+
+    // Close the file
+    outputFile.close();
+
+    return 0;
+    //
+    cv::Mat img = takePicture();
+    std::vector<cv::Point2f> coordsBall = findObject(img, HOUGH, BALL);
+    std::vector<cv::Point2f> coordsCups = findObject(img, HOUGH, TARGET);
+
+    UR.moveL(coordsBall[0].x*0.01, coordsBall[0].y*0.01, 0, 0, 0);
+    UR.gripper_gripBall();
+    UR.moveL(coordsCups[0].x*0.01, coordsCups[0].y*0.01, 0.15, 0, 0);
+    UR.moveL(coordsCups[1].x*0.01, coordsCups[1].y*0.01, 0.15, 0, 0);
+    UR.moveL(coordsCups[2].x*0.01, coordsCups[2].y*0.01, 0.15, 0, 0);
+    UR.gripper_releaseBall(4);
+
+
 
     return 0;
     Eigen::Vector3d throwCordsW;
-    throwCordsW << 0.4, 0.3, 0.1;
+    throwCordsW << 0.3, 0.3, 0.2;
+
     double angle = UR.D2R(45);
-    double throwSpeed = 2; // 1m/s
+    double throwSpeed = 1; // 1m/s
+
     Eigen::Vector3d throwSpeedVec;
     throwSpeedVec << cos(angle)*throwSpeed, 0, sin(angle)*throwSpeed;
+
     Eigen::Vector3d startCordsW;
-    startCordsW << 0.0, 0.3, 0.0;
+    startCordsW << 0.1, 0.25, 0.05;
 
     UR.throwFixed(throwCordsW, throwSpeedVec, startCordsW);
     //UR.moveL(throwCordsW(0), throwCordsW(1), throwCordsW(2),0);
