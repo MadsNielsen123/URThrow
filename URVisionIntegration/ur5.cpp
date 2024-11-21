@@ -2,6 +2,7 @@
 #include <cmath>
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 {
@@ -25,14 +26,14 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 
-    //Initialize gripper
-    mGripperSocket.connectToHost("192.168.1.20", 1000);
-    if(!mGripperSocket.waitForConnected(5000))
-    {
-        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-    }
+//    //Initialize gripper
+//    mGripperSocket.connectToHost("192.168.1.20", 1000);
+//    if(!mGripperSocket.waitForConnected(5000))
+//    {
+//        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+//    }
 
-    gripper_home();
+//    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -276,32 +277,55 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     Eigen::VectorXd throwJointSpeeds = pseudoinverse * (mR_BW * throwSpeedW);
 
     std::cout << "speeds:\n" << throwJointSpeeds << std::endl;
-    mRTDE_ctrl.moveJ(jThrowPos);
-    mRTDE_ctrl.moveJ(jStartPos);
 
-    double T = 0;
+    std::vector<double> Ti;
 
-    //Calculate smallest T (from slowest link)
+    //Calculate Tmax for all joints
+
     for(int i = 0; i<6; ++i)
     {   if(throwJointSpeeds[i] != 0)
-        {            double TJ = std::abs((2*(jThrowPos[i]-jStartPos[i]))/throwJointSpeeds[i]); //Minimum time T to reach joint speed for the throw (with linear acceleration and the exact joint-distance)
-
-            //Save the largest
-            if(TJ > T)
-                T = TJ;
+        {
+            Ti.push_back(abs((2* abs(jThrowPos[i]-jStartPos[i] ) )/throwJointSpeeds[i]));
         }
+        else
+            Ti.push_back(0);
     }
 
-    T = 0.4;
-    std::cout << "T: " << T << std::endl;
-
-    //Calcualte accelrations
-    Eigen::VectorXd jointAccelerations(6);
     for(int i = 0; i<6; ++i)
     {
-        jointAccelerations[i] = ((2*(jThrowPos[i]-jStartPos[i]))/(T*T));
+        std::cout << "totalTime: " << Ti[i]<< std::endl;
     }
-    std::cout << "accelerations:\n" << jointAccelerations << std::endl;
+
+    //Calcualte accelrations
+    std::vector<double> jointAccelerations;
+    for(int i = 0; i<6; ++i)
+    {
+        if(Ti[i] <= 0)
+        {
+            jointAccelerations.push_back(0);
+        }
+        else
+            jointAccelerations.push_back(throwJointSpeeds[i]/Ti[i]);
+    }
+
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << "acc: " << jointAccelerations[i] << std::endl;
+    }
+
+    //Calculate acceleration start time
+    double Tmax  = *std::max_element(Ti.begin(), Ti.end()); //Biggest of all joints Tmax
+
+    std::cout << "T:" << Tmax << std::endl;
+
+    std::vector<double> accStartTime;
+    for(int i = 0; i<6; ++i)
+    {
+        accStartTime.push_back(Tmax-Ti[i]);
+        std::cout << "AccStartTime: " << accStartTime[i] << std::endl;
+    }
+
+
     //Move to start position
     mRTDE_ctrl.moveJ(jThrowPos);
     mRTDE_ctrl.moveJ(jStartPos);
@@ -309,9 +333,11 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     //Start the throw
     std::chrono::system_clock::time_point currentTime;
     std::chrono::duration<double> interval(0.008); // 8 milliseconds -> 125Hz
+    std::vector<double> jointVelocity(6);
 
     auto startTime = std::chrono::high_resolution_clock::now();
     auto lastCommandTime = startTime;
+    std::cout << "start throw.." << std::endl;
     while(true)
     {
         currentTime = std::chrono::high_resolution_clock::now();
@@ -320,18 +346,33 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         //Send speedJ commands with 125Hz
         if(currentTime - lastCommandTime >= interval)
         {
+            for(int i= 0; i<6; ++i)
+            {
+                if(t.count() < accStartTime[i])
+                {
+                   jointVelocity[i] = 0;
+                }
+                else
+                {
+                    jointVelocity[i] = jointAccelerations[i]*(t.count()-accStartTime[i]);
+                }
+            }
+
             //Set joints speeds from acceleration * time. (Acceleration limit: 10, stop time: 100ms)
-            mRTDE_ctrl.speedJ({jointAccelerations[0]*t.count(), jointAccelerations[1]*t.count(), jointAccelerations[2]*t.count(), jointAccelerations[3]*t.count(), jointAccelerations[4]*t.count(), jointAccelerations[5]*t.count()},10,0.1);
+            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]},10,0.1);
             lastCommandTime = currentTime;
 
         }
 
         //End Throw
-        if(t.count() >= T)
+        if(t.count() >= Tmax)
+        {
             break;
+        }
+
     }
     //Throw here (or a little earlier)
-    mRTDE_ctrl.speedStop(5);
+    mRTDE_ctrl.speedStop(10);
 }
 
 

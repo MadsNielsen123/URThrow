@@ -341,76 +341,18 @@ int main()
 
     UR5 UR;
 
-    // Create a vector to store the timings
-        std::vector<double> timings;
+//    cv::Mat img = takePicture();
+//    std::vector<cv::Point2f> coordsBall = findObject(img, HOUGH, BALL);
+//    std::vector<cv::Point2f> coordsCups = findObject(img, HOUGH, TARGET);
 
-    // Open a file to save the timings
-    std::ofstream outputFile("timings.txt");
-
-    if (!outputFile.is_open()) {
-        std::cerr << "Error opening file for writing!" << std::endl;
-        return 1;
-    }
-
-    for (int i = 0; i < 1; ++i) {
-        UR.moveL(0, 0, 0, 0, 0);
-        UR.gripper_gripBall();
-        UR.moveL(0, 0, 0.05, 0, 0);
-        UR.moveL(0.05, 0.05, 0.05, 0, 0);
-        UR.moveL(0.05, 0.05, 0.01, 0, 0);
-
-        // Start timer for gripper_releaseBall
-        auto startTime = std::chrono::high_resolution_clock::now();
-        UR.gripper_releaseBall();
-        auto endTime = std::chrono::high_resolution_clock::now();
-
-        // Calculate the duration in milliseconds
-        double elapsedTime = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-        timings.push_back(elapsedTime);
-
-        // Save the timing immediately
-        outputFile << elapsedTime << " ms" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        UR.gripper_home();
-        UR.moveL(0.05, 0.05, 0.005, 0, 0);
-        UR.gripper_gripBall();
-        UR.moveL(0.05, 0.05, 0.04, 0, 0);
-        UR.moveL(0, 0, 0.005, 0, 0);
-
-        // Start timer for second gripper_releaseBall
-        startTime = std::chrono::high_resolution_clock::now();
-        UR.gripper_releaseBall();
-        endTime = std::chrono::high_resolution_clock::now();
-
-        // Calculate the duration in milliseconds
-        elapsedTime = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-        timings.push_back(elapsedTime);
-
-        // Save the timing immediately
-        outputFile << elapsedTime << " ms" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        UR.gripper_home();
-    }
-
-    // Close the file
-    outputFile.close();
-
-    return 0;
-    //
-    cv::Mat img = takePicture();
-    std::vector<cv::Point2f> coordsBall = findObject(img, HOUGH, BALL);
-    std::vector<cv::Point2f> coordsCups = findObject(img, HOUGH, TARGET);
-
-    UR.moveL(coordsBall[0].x*0.01, coordsBall[0].y*0.01, 0, 0, 0);
-    UR.gripper_gripBall();
-    UR.moveL(coordsCups[0].x*0.01, coordsCups[0].y*0.01, 0.15, 0, 0);
-    UR.moveL(coordsCups[1].x*0.01, coordsCups[1].y*0.01, 0.15, 0, 0);
-    UR.moveL(coordsCups[2].x*0.01, coordsCups[2].y*0.01, 0.15, 0, 0);
-    UR.gripper_releaseBall(4);
+//    UR.moveL(coordsBall[0].x*0.01, coordsBall[0].y*0.01, 0, 0, 0);
+//    UR.gripper_gripBall();
+//    UR.moveL(coordsCups[0].x*0.01, coordsCups[0].y*0.01, 0.15, 0, 0);
+//    UR.moveL(coordsCups[1].x*0.01, coordsCups[1].y*0.01, 0.15, 0, 0);
+//    UR.moveL(coordsCups[2].x*0.01, coordsCups[2].y*0.01, 0.15, 0, 0);
+//    UR.gripper_releaseBall(4);
 
 
-
-    return 0;
     Eigen::Vector3d throwCordsW;
     throwCordsW << 0.3, 0.3, 0.2;
 
@@ -421,7 +363,7 @@ int main()
     throwSpeedVec << cos(angle)*throwSpeed, 0, sin(angle)*throwSpeed;
 
     Eigen::Vector3d startCordsW;
-    startCordsW << 0.1, 0.25, 0.05;
+    startCordsW << 0.1, 0.3, 0.05;
 
     UR.throwFixed(throwCordsW, throwSpeedVec, startCordsW);
     //UR.moveL(throwCordsW(0), throwCordsW(1), throwCordsW(2),0);
