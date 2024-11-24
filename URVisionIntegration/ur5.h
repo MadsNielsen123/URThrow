@@ -43,7 +43,7 @@ public:
 private:
     // ---------- UR Connection/Control -----------
     //std::string mIP = "192.168.1.54"; //UR
-    std::string mIP = "192.168.56.101"; //UR sim
+    std::string mIP = "192.168.0.26"; //UR sim
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;
@@ -60,6 +60,11 @@ private:
     // ---------- Gripper Connection/Control -----------
     QTcpSocket mGripperSocket;
     bool mGripped = false;
+
+    //Throw internal methods:
+    Eigen::VectorXd getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::Vector3d throwSpeedW);
+    std::pair<std::vector<double>, std::vector<double>> getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW);
+
 };
 
 #endif // UR5_H

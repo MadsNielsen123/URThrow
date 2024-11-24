@@ -354,7 +354,7 @@ int main()
 
 
     Eigen::Vector3d throwCordsW;
-    throwCordsW << 0.3, 0.3, 0.2;
+    throwCordsW << 0.5, 0.3, 0.2;
 
     double angle = UR.D2R(45);
     double throwSpeed = 1; // 1m/s
