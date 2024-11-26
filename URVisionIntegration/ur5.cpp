@@ -8,10 +8,17 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 {
     // mRTDE_ctrl.setWatchdog(0.0043); //Acknowledge time for the robot (Frequency)
 
+    //Precice SVD (Not othogonal though)
     mT_BW << 0.3843,   0.932,  -0.0001, -0.1151,
            -0.9232,   0.3843,  0.0005, -0.3732,
             0.0005,  -0.0001,  1,      -0.0217,
             0,        0,       0,       1;
+
+    //Less precice (But othogonal)
+    mT_BW  <<  0.3827,	 0.9239,	-0.0001,	-0.1151,
+              -0.9239,	 0.3827,	 0.0005,	-0.3732,
+               0.0005,	-0.0001,	 1.0000,	-0.0217,
+               0,         0,	     0,	     1.0000;
 
     mR_BW = mT_BW.topLeftCorner(3, 3);
 
@@ -115,7 +122,6 @@ Eigen::Matrix4d UR5::getT_World2TCP(double degreesZ, double degreesX) const
     //Fixed angle (rot TCP-frame around stationary W-frame)
     T_WTCP.block<3, 3>(0, 0) = RotZ*RotX*RotX180; // Set top-left corner to 3x3 matrix
     T_WTCP(3, 3) = 1;
-
     return T_WTCP;
 }
 
@@ -229,35 +235,32 @@ Eigen::VectorXd UR5::getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::V
 
 std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW)
 {
+    std::vector<double> bThrowPos(6), bStartPos(6);
+
     //Convert to base cordiantes -translation-
     Eigen::Vector3d throwCordsB = world2baseCords(throwCordsW);
     Eigen::Vector3d startCordsB = world2baseCords(startCordsW);
-    std::vector<double> bThrowPos = {throwCordsB(0), throwCordsB(1), throwCordsB(2)};
-    std::vector<double> bStartPos = {startCordsB(0), startCordsB(1), startCordsB(2)};
+    bThrowPos[0] = throwCordsB(0);
+    bThrowPos[1] = throwCordsB(1);
+    bThrowPos[2] = throwCordsB(2);
+    bStartPos[0] = startCordsB(0);
+    bStartPos[1] = startCordsB(1);
+    bStartPos[2] = startCordsB(2);
 
     //Convert to base cordiantes -orientation-
     Eigen::Vector3d pathVector = (throwCordsW-startCordsW);
-
-    // Extract the x and y components of the vector
     double x = pathVector.x();
     double y = pathVector.y();
-
-    // Compute the magnitude of the vector in the x/y plane
     double magnitude = std::sqrt(x * x + y * y);
-
-    // Compute the cosine of the angle with respect to the x-axis
     double cosTheta = x / magnitude;
+    cosTheta = std::max(-1.0, std::min(1.0, cosTheta)); // Clamp the value to the range [-1, 1] to handle numerical precision issues
 
-
-    // Clamp the value to the range [-1, 1] to handle numerical precision issues
-    cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
-
-    // Compute the angle in radians
+    // Compute the angle
     double angle = std::acos(cosTheta);
-
-    // Convert to degrees if needed (optional)
     double angleDegrees = angle * (180.0 / M_PI);
+
     Eigen::Matrix4d T_BTCP;
+
     if(y>0)
         T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,45);
     else
@@ -265,16 +268,29 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPositi
 
     Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
     Eigen::Vector3d axis = angleAxis.axis();
-    bThrowPos.push_back(axis(0)*angleAxis.angle()); bThrowPos.push_back(axis(1)*angleAxis.angle()); bThrowPos.push_back(axis(2)*angleAxis.angle());
-    bStartPos.push_back(axis(0)*angleAxis.angle()); bStartPos.push_back(axis(1)*angleAxis.angle()); bStartPos.push_back(axis(2)*angleAxis.angle());
+
+    bThrowPos[3] = axis(0)*angleAxis.angle();
+    bThrowPos[4] = axis(1)*angleAxis.angle();
+    bThrowPos[5] = axis(2)*angleAxis.angle();
+
+
+    if(y>0)
+        T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,-20);
+    else
+        T_BTCP = mT_BW*getT_World2TCP(-angleDegrees-90,-20);
+
+    angleAxis = T_BTCP.block<3,3>(0,0);
+    axis = angleAxis.axis();
+
+    bStartPos[3] = axis(0)*angleAxis.angle();;
+    bStartPos[4] = axis(1)*angleAxis.angle();;
+    bStartPos[5] = axis(2)*angleAxis.angle();;
 
     return std::make_pair(bThrowPos, bStartPos);
 }
 
 void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, Eigen::Vector3d startCordsW)
 {
-
-    //std::cout << "Throwspeed: \n" << throwSpeedW << std::endl;
 
     //Convert from world -> Base frame (with throw orientation)
     auto baseCartesianThrowStartPos = getBaseStartThrowPosition(throwCordsW, startCordsW); //Pair of std::vector<double>
@@ -285,98 +301,43 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
     //Calculate joint speeds of throw
     Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPos, throwSpeedW);
-    std::cout << "speeds:\n" << throwJointSpeeds << std::endl;
-
 
     // --------------------------------------------------------- CALCULATE ACCERLATION AND ACCLERATION START TIME  --------------------------------------------------------------------
 
 
+    double T = 1;
 
-//    double maxAcc = 1*M_PI; //Max 1 full-rot/s
+    std::vector<double> a(6), b(6), c(6), d(6), e(6);
 
-//    std::vector<double> Ti;
+    for (int i = 0; i < 6; ++i)
+    {
+        // Create the coefficient matrix
+        Eigen::MatrixXd A(5, 5);
+        A <<
+            0               , 0               , 0             , 0, 1,   // P(0) = e = qstart
+            std::pow(T, 4)  , std::pow(T, 3)  , std::pow(T, 2), T, 1,   // P(T) = a*t⁴+b*t³+c*t²+d*t+e = qthrow
+            0               , 0               , 0             , 1, 0,   // V(0) = d = 0
+            4*std::pow(T, 3), 3*std::pow(T, 2), 2*T           , 1, 0,   // V(T) = 4*a*t³+3*b*t²+2*c*t+d
+            0               , 0               , 1             , 0, 0;   // A(0) = c = 0
 
-//    //Calculate Tmax for all joints
+        // Create the right-hand side vector
+        Eigen::VectorXd B(5);
+        B << jStartPos[i],
+             jThrowPos[i],
+             0,
+             throwJointSpeeds[i],
+             0;
 
-////    for(int i = 0; i<6; ++i)
-////    {   if(throwJointSpeeds[i] != 0)
-////        {
-////            Ti.push_back(abs((2* abs(jThrowPos[i]-jStartPos[i] ) )/throwJointSpeeds[i]));
-////        }
-////        else
-////            Ti.push_back(0);
-////    }
+        // Solve the linear system
+        Eigen::VectorXd solution = A.colPivHouseholderQr().solve(B);
 
-//    for(int i = 0; i<6; ++i)
-//    {
-//            Ti.push_back(abs( sqrt((2*abs(jThrowPos[i]-jStartPos[i]))/maxAcc )));
-//    }
-
-//    for(int i = 0; i<6; ++i)
-//    {
-//        std::cout << "totalTime: " << Ti[i]<< std::endl;
-//    }
-
-//    //Calcualte accelrations
-//    std::vector<double> jointAccelerations;
-//    for(int i = 0; i<6; ++i)
-//    {
-//        if(Ti[i] <= 0)
-//        {
-//            jointAccelerations.push_back(0);
-//        }
-//        else
-//            jointAccelerations.push_back(throwJointSpeeds[i]/Ti[i]);
-//    }
-
-//    for(int i = 0; i<6; ++i)
-//    {
-//        std::cout << "acc: " << jointAccelerations[i] << std::endl;
-//    }
-
-//    //Calculate acceleration start time
-//    double Tmax  = *std::max_element(Ti.begin(), Ti.end()); //Biggest of all joints Tmax
-
-//    std::cout << "T:" << Tmax << std::endl;
-
-//    std::vector<double> accStartTime;
-//    for(int i = 0; i<6; ++i)
-//    {
-//        accStartTime.push_back(Tmax-Ti[i]);
-//        std::cout << "AccStartTime: " << accStartTime[i] << std::endl;
-//    }
-
-
-    double maxAcc = M_PI; // Maks acceleration (1 fuld rotation per sekund)
-    std::vector<double> accStartTime(6, 0.0);
-    std::vector<double> jointAccelerations(6, 0.0);
-
-    // Beregn T_i for hver joint
-    std::vector<double> Ti(6, 0.0);
-    for (int i = 0; i < 6; ++i) {
-        double distance = abs(jThrowPos[i] - jStartPos[i]);
-        double T_dist = sqrt((2 * distance) / maxAcc); // T for at nå positionen
-        double T_speed = throwJointSpeeds[i] / maxAcc; // T for at nå hastigheden
-        Ti[i] = std::max(T_dist, T_speed); // Vælg den største
+        // Store the coefficients
+        a[i] = solution(0);
+        b[i] = solution(1);
+        c[i] = solution(2);
+        d[i] = solution(3);
+        e[i] = solution(4);
     }
-
-    // Find T_max
-    double T_max = *std::max_element(Ti.begin(), Ti.end());
-
-    // Beregn accelerationer og forsinkelsestider
-    for (int i = 0; i < 6; ++i) {
-        double distance = abs(jThrowPos[i] - jStartPos[i]);
-        jointAccelerations[i] = (2*distance)/(T_max*T_max);
-        accStartTime[i] = T_max - Ti[i]; // Forsinkelsestid
-    }
-
-    // Debug output
-    std::cout << "T_max: " << T_max << std::endl;
-    for (int i = 0; i < 6; ++i) {
-        std::cout << "Joint " << i + 1 << ": Acceleration = " << jointAccelerations[i]
-                  << ", Acc Start Time = " << accStartTime[i] << std::endl;
-    }
-
 
     // --------------------------------------------------------- THROW PART (WORKS) --------------------------------------------------------------------
 
@@ -384,32 +345,34 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     mRTDE_ctrl.moveJ(jThrowPos);
     mRTDE_ctrl.moveJ(jStartPos);
 
-    //Start the throw
+    //Ready timer
     std::chrono::system_clock::time_point currentTime;
     std::chrono::duration<double> interval(0.008); // 8 milliseconds -> 125Hz
-    std::vector<double> jointVelocity(6);
+    double t;
 
+    //Ready throw
+    std::vector<double> jointVelocity(6);
+    bool ballReleased = false;
+    QByteArray response;
+    QString command = "release(4,250)\n";
+
+
+    //Start the throw
     auto startTime = std::chrono::high_resolution_clock::now();
     auto lastCommandTime = startTime;
-    std::cout << "start throw.." << std::endl;
+
     while(true)
     {
         currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> t = currentTime-startTime;
+        std::chrono::duration<double> dur = currentTime-startTime;
+        t = dur.count();
 
         //Send speedJ commands with 125Hz
         if(currentTime - lastCommandTime >= interval)
         {
             for(int i= 0; i<6; ++i)
-            {
-                if(t.count() < accStartTime[i])
-                {
-                   jointVelocity[i] = 0;
-                }
-                else
-                {
-                    jointVelocity[i] = jointAccelerations[i]*(t.count()-accStartTime[i]);
-                }
+            {           
+                    jointVelocity[i] = 4*a[i]*(t*t*t) + 3*b[i]*(t*t);
             }
 
             //Set joints speeds from acceleration * time. (Acceleration limit: 10, stop time: 100ms)
@@ -418,15 +381,27 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
         }
 
+        //Throw 100ms before movement end (gripper delay)
+        if(t >= T-0.1 && !ballReleased)
+        {
+            ballReleased = true;
+            //Throw
+            //mGripperSocket.write(command.toUtf8()); //Send command
+        }
+
         //End Throw
-        if(t.count() >= T_max)
+        if(t >= T)
         {
             break;
         }
 
     }
-    //Throw here (or a little earlier)
-    mRTDE_ctrl.speedStop(20);
+
+    mRTDE_ctrl.speedStop(10);
+
+//    if(!mGripperSocket.waitForReadyRead(5000))
+//        qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
+//    mGripperSocket.readAll(); //Empty buffer
 }
 
 

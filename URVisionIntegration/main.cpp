@@ -336,6 +336,23 @@ std::vector<cv::Point2f> findObject(cv::Mat& image, int method = 1, int object =
 
 }
 
+std::vector<double> calSpeed(const double& x_s, const double& y_s, const double& z_s, const double& x_f, const double& y_f, const double& z_f){
+    double range = std::sqrt(pow(x_f-x_s, 2) + pow(y_f-y_s, 2));
+    double g = 9.82;
+
+    double v = std::sqrt((g*pow(range, 2)) / (x_s-z_f+range));
+
+    double v_to_vx_angle = std::atan((y_f-y_s) / (x_f-x_s));
+
+    double tcp_speed_x = v * std::sqrt(2)/2 * std::cos(v_to_vx_angle);
+    double tcp_speed_y = v * std::sqrt(2)/2 * std::sin(v_to_vx_angle);
+    double tcp_speed_z = v * std::sqrt(2)/2;
+
+    std::vector<double> velocities = {v, tcp_speed_x, tcp_speed_y, tcp_speed_z};;
+
+    return velocities;
+}
+
 int main()
 {
 
@@ -366,6 +383,9 @@ int main()
     startCordsW << 0.1, 0.3, 0.05;
 
     UR.throwFixed(throwCordsW, throwSpeedVec, startCordsW);
+
+
+
     //UR.moveL(throwCordsW(0), throwCordsW(1), throwCordsW(2),0);
 //    UR.moveL(0, 0, 0, 0);
 
