@@ -41,10 +41,10 @@ int main()
 
 
     Eigen::Vector3d throwCordsW;
-    throwCordsW << 0.4, 0.2, 0.25;
+    throwCordsW << 0.35, 0.2, 0.45;
 
-    double angle = UR.D2R(50);
-    double throwSpeed = 2; // 1m/s
+    double angle = UR.D2R(45);
+    double throwSpeed = 1; // 1m/s
 
     Eigen::Vector3d throwSpeedVec;
     throwSpeedVec << cos(angle)*throwSpeed, 0, sin(angle)*throwSpeed;
