@@ -33,14 +33,14 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 
-//    //Initialize gripper
-//    mGripperSocket.connectToHost("192.168.1.20", 1000);
-//    if(!mGripperSocket.waitForConnected(5000))
-//    {
-//        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-//    }
+    //Initialize gripper
+    mGripperSocket.connectToHost("192.168.1.20", 1000);
+    if(!mGripperSocket.waitForConnected(5000))
+    {
+        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+    }
 
-//    gripper_home();
+    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -299,6 +299,16 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     std::vector<double> jThrowPos = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPos.first);
     std::vector<double> jStartPos = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPos.second);
 
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << "Throw: " << jThrowPos[i] << std::endl;
+    }
+
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << "Start: " << jStartPos[i] << std::endl;
+    }
+
     //Calculate joint speeds of throw
     Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPos, throwSpeedW);
 
@@ -331,12 +341,18 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         // Solve the linear system
         Eigen::VectorXd solution = A.colPivHouseholderQr().solve(B);
 
+        std::cout << "sol: " << std::endl;
+        std::cout << solution << std::endl;
+
         // Store the coefficients
-        a[i] = solution(0);
-        b[i] = solution(1);
+       //a[i] = solution(0);
+        //b[i] = solution(1);
         c[i] = solution(2);
         d[i] = solution(3);
         e[i] = solution(4);
+
+        a = {0.0751, 0.2283, 1.1029, -2.3472, 0.1862, 0.2037};
+        b = {-0.1235, -0.7637, -0.3823, 3.2825, -0.3032, -0.1716};
     }
 
     // --------------------------------------------------------- THROW PART (WORKS) --------------------------------------------------------------------
@@ -354,7 +370,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     std::vector<double> jointVelocity(6);
     bool ballReleased = false;
     QByteArray response;
-    QString command = "release(4,250)\n";
+    QString command = "release(6,250)\n";
 
 
     //Start the throw
@@ -376,17 +392,17 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
             }
 
             //Set joints speeds from acceleration * time. (Acceleration limit: 10, stop time: 100ms)
-            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]},10,0.1);
+            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]},20,0.1);
             lastCommandTime = currentTime;
 
         }
 
         //Throw 100ms before movement end (gripper delay)
-        if(t >= T-0.1 && !ballReleased)
+        if(t >= T-0.01 && !ballReleased)
         {
+            std::cout << "NU!" << std::endl;
             ballReleased = true;
-            //Throw
-            //mGripperSocket.write(command.toUtf8()); //Send command
+
         }
 
         //End Throw
@@ -397,11 +413,11 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
     }
 
-    mRTDE_ctrl.speedStop(10);
-
-//    if(!mGripperSocket.waitForReadyRead(5000))
-//        qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
-//    mGripperSocket.readAll(); //Empty buffer
+    mGripperSocket.write(command.toUtf8()); //Send throw command
+    if(!mGripperSocket.waitForReadyRead(1000))
+        qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
+    mRTDE_ctrl.speedStop(20);
+    mGripperSocket.readAll(); //Empty buffer
 }
 
 

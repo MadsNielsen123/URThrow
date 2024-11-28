@@ -34,5 +34,7 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 add_executable(URVisionIntegration
   main.cpp
   ur5.h ur5.cpp
+  cameraFunctions.h cameraFunctions.cpp
+
 )
 target_link_libraries(URVisionIntegration Qt${QT_VERSION_MAJOR}::Core Qt5::Network ${OpenCV_LIBS}  ${Pylon_LIBRARIES} ur_rtde::rtde Eigen3::Eigen)
