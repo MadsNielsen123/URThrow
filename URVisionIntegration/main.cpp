@@ -29,6 +29,7 @@ int main()
 {
 
     UR5 UR;
+    UR.gripper_gripBall();
 //    cv::Mat img = takePicture();
 //    std::vector<cv::Point2f> coordsBall = findObject(img, BALL);
 //    std::vector<cv::Point2f> coordsCups = findObject(img, TARGET);
@@ -41,13 +42,21 @@ int main()
 
 
     Eigen::Vector3d throwCordsW;
-    throwCordsW << 0.35, 0.2, 0.45;
+    throwCordsW << 0.35, 0.15, 0.45;
 
+    std::vector<double> throwSp = calSpeed(throwCordsW[0], throwCordsW[1], throwCordsW[2], 0.60, 0.1, 0.10);
+
+    std::cout << throwSp[0] << std::endl;
+    std::cout << throwSp[1] << std::endl;
+    std::cout << throwSp[2] << std::endl;
+    std::cout << throwSp[3] << std::endl;
+
+    //return 0;
     double angle = UR.D2R(45);
-    double throwSpeed = 1; // 1m/s
+    double throwSpeed = 0.8; // 1m/s
 
     Eigen::Vector3d throwSpeedVec;
-    throwSpeedVec << cos(angle)*throwSpeed, 0, sin(angle)*throwSpeed;
+    throwSpeedVec << throwSp[0],throwSp[1],throwSp[2];
 
     Eigen::Vector3d startCordsW;
     startCordsW << 0.1, 0.2, 0.1;

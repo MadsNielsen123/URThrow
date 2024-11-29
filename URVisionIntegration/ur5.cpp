@@ -33,14 +33,14 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 
-//    //Initialize gripper
-//    mGripperSocket.connectToHost("192.168.1.20", 1000);
-//    if(!mGripperSocket.waitForConnected(5000))
-//    {
-//        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-//    }
+    //Initialize gripper
+    mGripperSocket.connectToHost("192.168.1.20", 1000);
+    if(!mGripperSocket.waitForConnected(5000))
+    {
+        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+    }
 
-//    gripper_home();
+    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -312,6 +312,8 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     std::cout << std::endl;
     //Calculate joint speeds of throw
     Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPos, throwSpeedW);
+    std::cout << "JointSpeeds:" << std::endl;
+    std::cout << throwJointSpeeds<< std::endl;
 
     // --------------------------------------------------------- CALCULATE ACCERLATION AND ACCLERATION START TIME  --------------------------------------------------------------------
 
@@ -342,8 +344,8 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         // Solve the linear system
         Eigen::VectorXd solution = A.colPivHouseholderQr().solve(B);
 
-        std::cout << "sol[J" << i << "]: " << std::endl;
-        std::cout << solution << std::endl;
+//        std::cout << "sol[J" << i << "]: " << std::endl;
+//        std::cout << solution << std::endl;
 
         // Store the coefficients
         a[i] = solution(0);
@@ -364,20 +366,21 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
     //Ready timer
     std::chrono::system_clock::time_point currentTime;
-    std::chrono::duration<double> interval(0.008); // 8 milliseconds -> 125Hz
+    std::chrono::duration<double> interval(0.00799); // 8 milliseconds -> 125Hz
     double t;
 
     //Ready throw
     std::vector<double> jointVelocity(6);
     bool ballReleased = false;
-//    QByteArray response;
-//    QString command = "release(6,250)\n";
+    QByteArray response;
+    QString command = "release(6,250)\n";
+    mRTDE_ctrl.speedStop(20);
 
 
     //Start the throw
     auto startTime = std::chrono::high_resolution_clock::now();
     auto lastCommandTime = startTime;
-
+    int count = 0;
     while(true)
     {
         currentTime = std::chrono::high_resolution_clock::now();
@@ -393,16 +396,18 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
             }
 
             //Set joints speeds from acceleration * time. (Acceleration limit: 10, stop time: 100ms)
-            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]},40,0.1);
+            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]},40,0.0085);
             lastCommandTime = currentTime;
-
+            count++;
         }
 
         //Throw 100ms before movement end (gripper delay)
-        if(t >= T-0.01 && !ballReleased)
+        if(t >= T-0.1 && !ballReleased)
         {
-            std::cout << "NU!" << std::endl;
-            ballReleased = true;
+            mGripperSocket.write(command.toUtf8()); //Send throw command
+            if(!mGripperSocket.waitForReadyRead(1000))
+                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
+            ballReleased = true;         
 
         }
 
@@ -414,11 +419,10 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
     }
 
-//    mGripperSocket.write(command.toUtf8()); //Send throw command
-//    if(!mGripperSocket.waitForReadyRead(1000))
-//        qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
-    mRTDE_ctrl.speedStop(20);
-//    mGripperSocket.readAll(); //Empty buffer
+
+    mRTDE_ctrl.speedStop(15);
+    std::cout << count << std::endl;
+    mGripperSocket.readAll(); //Empty buffer
 }
 
 
