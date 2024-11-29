@@ -4,7 +4,7 @@
 
 cv::Mat takePicture()
 {
-    //cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);
+    //cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT); //Doesnt work
     int myExposure = 30000;
     cv::Mat imgUndistorted;
 
@@ -114,151 +114,28 @@ cv::Mat takePicture()
 
 }
 
-std::vector<cv::Point2f> findObject(cv::Mat& image, int object, int method, int minRadiusBall, int maxRadiusBall, int minRadiusCup, int maxRadiusCup, int targetHeight)
+std::vector<Eigen::Vector3d> findBalls(cv::Mat& image)
 {
 
-    cv::Matx33f H = cv::Matx33f(-0.008453171254899592, -0.1027136663102614, 100.4104391989221,
-        -0.1108970334507943, 1.095836764117068e-05, 100.503555926516,
-        -0.0002133131348338028, -1.340640846687117e-05, 1);
-    if (object == TARGET)
-    {
-        H = cv::Matx33f (-0.007791881465124858, -0.09948645122707399, 99.89002391428173,
-                         -0.1075931183674724, -0.0002392212860721122, 101.6042958591801,
-                         -0.0001785793076406061, 2.295218118932419e-05, 0.9999999999999999);
-    }
-
-    cv::Matx33f K = cv::Matx33f(1193.5651, 0, 751.68048,
-        0, 1194.4763, 588.64459,
-        0, 0, 1);
+        int minRadiusBall = 14;
+        int maxRadiusBall = 17;
 
 
-    if (method == COLORSEG)
-    {
-        //init subimages
-        cv::Mat HSVImage;
-        cv::Mat maskedImage;
-        cv::Mat isolatedImage;
-
-        //convert from bgr to hsv
-        cv::cvtColor(image, HSVImage, cv::COLOR_BGR2HSV);
-
-        //define color mask thresholds
-        cv::Scalar lowVal(40, 128, 128);
-        cv::Scalar highVal(80, 255, 255);
-
-        //set pixels in range to white, not to black
-        cv::inRange(HSVImage, lowVal, highVal, maskedImage);
-
-        //openCV find contours in the image
-        std::vector<std::vector<cv::Point>> contours;
-        cv::findContours(maskedImage, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-
-        //find the largest area contour
-        int largestArea = 0;
-        int largestIndex = 0;
-        for (int i = 0; i < contours.size(); i++)
-        {
-            int area = cv::contourArea(contours[i]);
-            if (area > largestArea)
-            {
-                largestArea = area;
-                largestIndex = i;
-            }
-
-        }
-
-        //find the bounding box of the largest area
-        cv::Rect boundingBox = cv::boundingRect(contours[largestIndex]);
-
-        //draw the bounding box
-        cv::rectangle(maskedImage, boundingBox, cv::Scalar(60, 255, 255), 2);
-
-        //define the center points of the bounding box
-        int centerX = boundingBox.x + boundingBox.width / 2;
-        int centerY = boundingBox.y + boundingBox.height / 2;
-
-        //draw a small circle on the center point
-        cv::circle(maskedImage, cv::Point(centerX, centerY), 5, cv::Scalar(60, 255, 255), -1);
-
-        //define hardcoded camera -> world transformation
-        //indsæt de koordinater vi får fra billedgenkendelse i billed planet her? ------------------
-
-
-        // Now, we can use the homography matrix to transform a point.
-        //transform the center point previously found
-        cv::Point2f pixelPoint(centerX, centerY);
-
-        // Convert the point to homogeneous coordinates (add 1 to the point)
-        std::vector<cv::Point2f> pixelPoints;
-        pixelPoints.push_back(pixelPoint);
-
-        std::vector<cv::Point2f> realWorldTransformedPoints;
-
-        // Apply the homography to the point
-        cv::perspectiveTransform(pixelPoints, realWorldTransformedPoints, H);
-
-        // The resulting real world coordinates
-        std::cout << "The transformed real world coordinates are: ("
-            << realWorldTransformedPoints[0].x << ", "
-            << realWorldTransformedPoints[0].y << ")" << std::endl;
-
-        return { { realWorldTransformedPoints[0].x, realWorldTransformedPoints[0].y } };
-    }
-    else if (method == HOUGH)
-    {
-        //init subimages
+        //GrayImage
         cv::Mat grayImage;
-
-        //convert from bgr to gray
         cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
-
-
-
 
         //smoothing
         cv::GaussianBlur(grayImage, grayImage, cv::Size(3, 3), 0, 0);
 
+
+        //Hough Detection
+        int ballDistance = grayImage.rows / 16; // change this value to detect circles with different distances to each other
         std::vector<cv::Vec3f> circles;
-        HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1,
-            grayImage.rows / 16,  // change this value to detect circles with different distances to each other
-            100, 30, object ? minRadiusCup : minRadiusBall, object ? maxRadiusCup : maxRadiusBall // change the last two parameters
-            // (min_radius & max_radius) to detect larger circles
-        );
+        HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1, ballDistance, 100, 30, minRadiusBall, maxRadiusBall);
 
         if(circles.size() < 1)
-            std::cout << "Fandt ikke noget";
-
-
-        if (object == TARGET)
-        {
-            std::vector<cv::Vec3f> filteredCircles;
-            for (int i = 0; i < circles.size(); i++)
-            {
-                /*colorseg
-                cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC1);
-                circle(mask, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255), cv::FILLED);
-
-                cv::Mat maskedImage;
-                image.copyTo(maskedImage, mask);
-
-                // Convert the masked region to grayscale
-                cv::Mat grayMaskedImage;
-                cvtColor(maskedImage, grayMaskedImage, cv::COLOR_BGR2GRAY);
-
-                // Calculate mean intensity of the masked region
-                cv::Scalar meanIntensity = mean(grayMaskedImage, mask);
-
-                if (meanIntensity[0] > 200)//needs adjusting
-                {
-                    filteredCircles.emplace_back(circles[i]);
-                }*/
-
-                //location segmentation
-                if (circles[i][0] > 380 && circles[i][0] < 1030 && circles[i][1] > 380 && circles[i][1] < 700)//lower final value for cups further towards robot
-                    filteredCircles.emplace_back(circles[i]);
-            }
-            circles = filteredCircles;
-        }
+            std::cout << "Fandt ingen bolde";
 
         for (size_t i = 0; i < circles.size(); i++)
         {
@@ -274,8 +151,6 @@ std::vector<cv::Point2f> findObject(cv::Mat& image, int object, int method, int 
 
         //indsæt de koordinater vi får fra billedgenkendelse i billed planet her? ------------------
 
-
-
         //sort circles by radius
         std::sort(circles.begin(), circles.end(), [](cv::Vec3f& a, cv::Vec3f& b)
             {
@@ -284,47 +159,122 @@ std::vector<cv::Point2f> findObject(cv::Mat& image, int object, int method, int 
         );
 
 
-
-        //consider further segmenting, like still by color, example:
-        //average color value inside circle, grab the one closest to ping pong ball
-
-        //consider covering holes for even symmetric smooth surface
         std::vector<cv::Point2f> pixelPoints;
-        std::vector<cv::Point2f> realWorldTransformedPoints;
+
 
         pixelPoints.emplace_back(circles[0][0], circles[0][1]);
-        if (object == TARGET)
-        {
-            //cv::Matx33f Kinv = K.inv();
-            //cv::Matx33f Hinv = H.inv();
-            for (int i = 1; i < circles.size(); i++)
-            {
-                pixelPoints.emplace_back(circles[i][0], circles[i][1]);
-                /*
-                cv::Mat p_normalized = Kinv * (cv::Mat_<double>(3, 1) << circles[i][0], circles[i][1], 1);
-                cv::Mat ray_world = Hinv * p_normalized;
-                ray_world /= ray_world.at<double>(2, 0);
-                double scale = targetHeight / ray_world.at<double>(2, 0);
-                realWorldTransformedPoints.emplace_back(
-                    scale * ray_world.at<double>(0, 0),
-                    scale * ray_world.at<double>(1, 0)
-                );*/
-            }
-            //return realWorldTransformedPoints;
-        }
 
+        //Transform points to world coordinates
+        cv::Matx33f H = cv::Matx33f(-0.008453171254899592 , -0.1027136663102614   , 100.4104391989221,
+                                    -0.1108970334507943   ,  1.095836764117068e-05, 100.503555926516,
+                                    -0.0002133131348338028, -1.340640846687117e-05, 1);
+
+        cv::Matx33f K = cv::Matx33f(1193.5651, 0        , 751.68048,
+                                    0        , 1194.4763, 588.64459,
+                                    0        , 0        , 1);
+
+        std::vector<cv::Point2f> realWorldTransformedPoints;
         cv::perspectiveTransform(pixelPoints, realWorldTransformedPoints, H);
 
-
+        std::vector<Eigen::Vector3d> coordinates;
         for (int i = 0; i < realWorldTransformedPoints.size(); i++)
         {
+            //Scale cm -> meter
             realWorldTransformedPoints[i].x *= 0.01;
             realWorldTransformedPoints[i].y *= 0.01;
+
+            //Save point as Eigen 3D-vector
+            coordinates.push_back({realWorldTransformedPoints[i].x, realWorldTransformedPoints[i].y, 0}); //ball heigh: 0
+
         }
 
-        //std::cout << "the smallest circle radius is cm: " << circles[0][2] * 0.01 << std::endl;
-        return realWorldTransformedPoints;
+        return coordinates;
+
+}
+
+std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
+{
+
+    int minRadiusCup = 32;
+    int maxRadiusCup = 40;
+
+
+    //GrayImage
+    cv::Mat grayImage;
+    cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+
+    //smoothing
+    cv::GaussianBlur(grayImage, grayImage, cv::Size(3, 3), 0, 0);
+
+    //Hough Detection
+    int cupdistance = grayImage.rows / 16; // change this value to detect circles with different distances to each other
+    std::vector<cv::Vec3f> circles;
+    HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1, cupdistance, 100, 30, minRadiusCup, minRadiusCup );
+
+    if(circles.size() < 1)
+        std::cout << "Fandt inge cups";
+
+
+    std::vector<cv::Vec3f> filteredCircles;
+    for (int i = 0; i < circles.size(); i++)
+    {
+        if (circles[i][0] > 380 && circles[i][0] < 1030 && circles[i][1] > 380 && circles[i][1] < 700)//lower final value for cups further towards robot
+            filteredCircles.emplace_back(circles[i]);
+    }
+
+    circles = filteredCircles;
+
+    for (size_t i = 0; i < circles.size(); i++)
+    {
+        cv::Vec3i c = circles[i];
+        cv::Point center = cv::Point(c[0], c[1]);
+        // circle center
+        circle(image, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
+        // circle outline
+        int radius = c[2];
+        circle(image, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+    }
+
+
+    //sort circles by radius
+    std::sort(circles.begin(), circles.end(), [](cv::Vec3f& a, cv::Vec3f& b){return a[2] < b[2];});
+
+
+    std::vector<cv::Point2f> pixelPoints;
+    pixelPoints.emplace_back(circles[0][0], circles[0][1]);
+
+    for (int i = 1; i < circles.size(); i++)
+    {
+        pixelPoints.emplace_back(circles[i][0], circles[i][1]);
+    }
+
+
+    //Transform points to world coordinates
+    cv::Matx33f H = cv::Matx33f (-0.007791881465124858 , -0.09948645122707399  , 99.89002391428173,
+                                 -0.1075931183674724   , -0.0002392212860721122, 101.6042958591801,
+                                 -0.0001785793076406061,  2.295218118932419e-05, 0.9999999999999999);
+
+    cv::Matx33f K = cv::Matx33f(1193.5651,  0,          751.68048,
+                                0,          1194.4763,  588.64459,
+                                0,          0,          1);
+
+
+    std::vector<cv::Point2f> realWorldTransformedPoints;
+    cv::perspectiveTransform(pixelPoints, realWorldTransformedPoints, H);
+
+
+    std::vector<Eigen::Vector3d> coordinates;
+    for (int i = 0; i < realWorldTransformedPoints.size(); i++)
+    {
+        //Scale cm -> meter
+        realWorldTransformedPoints[i].x *= 0.01;
+        realWorldTransformedPoints[i].y *= 0.01;
+
+        //Save point as Eigen 3D-vector
+        coordinates.push_back({realWorldTransformedPoints[i].x, realWorldTransformedPoints[i].y, 0.1}); //cup height: 10 cm heigh
 
     }
+
+    return coordinates;
 
 }

@@ -33,14 +33,14 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 
-    //Initialize gripper
-    mGripperSocket.connectToHost("192.168.1.20", 1000);
-    if(!mGripperSocket.waitForConnected(5000))
-    {
-        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-    }
+//    //Initialize gripper
+//    mGripperSocket.connectToHost("192.168.1.20", 1000);
+//    if(!mGripperSocket.waitForConnected(5000))
+//    {
+//        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+//    }
 
-    gripper_home();
+//    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -130,11 +130,26 @@ void UR5::moveJ(std::vector<double> jointPos)
     mRTDE_ctrl.moveJ(jointPos);
 }
 
-void UR5::moveL(double wX, double wY, double wZ, double tcpAngleZ, double tcpAngleX, bool asynchonous)
+void UR5::moveL(double cordX, double cordY, double cordZ, double tcpAngleZ, double tcpAngleX, bool asynchonous)
 {
     //Translation
-    Eigen::Vector4d P_H(wX, wY, wZ, 1);         //Point int world coordinates
-    Eigen::Vector4d P_B = mT_BW*mT_TFTCP * P_H; //Point in Robot coordinates
+    Eigen::Vector4d P_H(cordX, cordY, cordZ, 1); //Homogenous Point int world coordinates
+    Eigen::Vector4d P_B = mT_BW*mT_TFTCP * P_H;              //Homogenous Point in Robot coordinates
+
+    //Orientation
+    Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(tcpAngleZ-90, tcpAngleX);
+    Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
+    Eigen::Vector3d axis = angleAxis.axis();
+
+    //MoveL
+    mRTDE_ctrl.moveL({P_B(0), P_B(1), P_B(2), axis(0)*angleAxis.angle(), axis(1)*angleAxis.angle(), axis(2)*angleAxis.angle()}, 0.25, 1.2, asynchonous);
+}
+
+void UR5::moveL(Eigen::Vector3d cords, double tcpAngleZ, double tcpAngleX, bool asynchonous)
+{
+    //Translation
+    Eigen::Vector4d P_H(cords.x(), cords.y(), cords.z(), 1); //Homogenous Point int world coordinates
+    Eigen::Vector4d P_B = mT_BW*mT_TFTCP * P_H;              //Homogenous Point in Robot coordinates
 
     //Orientation
     Eigen::Matrix4d T_BTCP = mT_BW*getT_World2TCP(tcpAngleZ-90, tcpAngleX);
@@ -372,8 +387,8 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     //Ready throw
     std::vector<double> jointVelocity(6);
     bool ballReleased = false;
-    QByteArray response;
-    QString command = "release(6,250)\n";
+//    QByteArray response;
+//    QString command = "release(6,250)\n";
     mRTDE_ctrl.speedStop(20);
 
 
@@ -404,9 +419,9 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         //Throw 100ms before movement end (gripper delay)
         if(t >= T-0.1 && !ballReleased)
         {
-            mGripperSocket.write(command.toUtf8()); //Send throw command
-            if(!mGripperSocket.waitForReadyRead(1000))
-                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
+//            mGripperSocket.write(command.toUtf8()); //Send throw command
+//            if(!mGripperSocket.waitForReadyRead(1000))
+//                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
             ballReleased = true;         
 
         }
@@ -422,7 +437,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
     mRTDE_ctrl.speedStop(15);
     std::cout << count << std::endl;
-    mGripperSocket.readAll(); //Empty buffer
+//    mGripperSocket.readAll(); //Empty buffer
 }
 
 

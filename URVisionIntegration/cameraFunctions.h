@@ -9,19 +9,15 @@
 #include <vector>
 #include <algorithm>
 
-
-
-
-//method
-#define COLORSEG 0
-#define HOUGH 1
-
-//object
-#define BALL 0
-#define TARGET 1
+// --------------------- EIGEN MATHS ---------------------------------
+//sudo apt-get install libeigen3-dev
+//https://eigen.tuxfamily.org/dox/group__QuickRefPage.html
+#include <Eigen/Core>       //Basic Linear Algebra (Matrix+vectors)
+#include <Eigen/Geometry>   //Basic Transformation, 2D, 3D rotations
+#include <Eigen/LU>         //Inverse ect
 
 cv::Mat takePicture();
-std::vector<cv::Point2f> findObject(cv::Mat& image, int object = 0, int method = 1,
-    int minRadiusBall = 14, int maxRadiusBall = 17, int minRadiusCup = 32, int maxRadiusCup = 40, int targetHeight = 10);
+std::vector<Eigen::Vector3d> findBalls(cv::Mat& image);
+std::vector<Eigen::Vector3d> findCups(cv::Mat& image);
 
 #endif // CAMERAFUNCTIONS_H

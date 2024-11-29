@@ -31,7 +31,8 @@ public:
     //Jacobean
     Eigen::Matrix<double, 6, 6> getJacobean(std::vector<double> jointPos) const;
 
-    void moveL(double wX, double wY, double wZ, double tcpAngleZ, double tcpAngleX, bool asynchonous = false);
+    void moveL(double cordX, double cordY, double cordZ, double tcpAngleZ, double tcpAngleX, bool asynchonous = false);
+    void moveL(Eigen::Vector3d cords, double tcpAngleZ, double tcpAngleX, bool asynchonous = false);
     void gripper_home();
     void moveJ(std::vector<double> jointPos);
     void gripper_gripBall();
@@ -42,8 +43,8 @@ public:
 
 private:
     // ---------- UR Connection/Control -----------
-    std::string mIP = "192.168.1.54"; //UR
-    //std::string mIP = "192.168.0.26"; //UR sim
+    //std::string mIP = "192.168.1.54"; //UR
+    std::string mIP = "192.168.0.26"; //UR sim
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;
