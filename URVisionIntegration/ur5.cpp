@@ -248,7 +248,7 @@ Eigen::VectorXd UR5::getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::V
     return pseudoinverse * (mR_BW * throwSpeedW);
 }
 
-std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW)
+std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
 {
     std::vector<double> bThrowPos(6), bStartPos(6);
 
@@ -263,9 +263,8 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPositi
     bStartPos[2] = startCordsB(2);
 
     //Convert to base cordiantes -orientation-
-    Eigen::Vector3d pathVector = (throwCordsW-startCordsW);
-    double x = pathVector.x();
-    double y = pathVector.y();
+    double x = speedVec.x();
+    double y = speedVec.y();
     double magnitude = std::sqrt(x * x + y * y);
     double cosTheta = x / magnitude;
     cosTheta = std::max(-1.0, std::min(1.0, cosTheta)); // Clamp the value to the range [-1, 1] to handle numerical precision issues
@@ -308,7 +307,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 {
 
     //Convert from world -> Base frame (with throw orientation)
-    auto baseCartesianThrowStartPos = getBaseStartThrowPosition(throwCordsW, startCordsW); //Pair of std::vector<double>
+    auto baseCartesianThrowStartPos = getBaseStartThrowPosition(throwCordsW, startCordsW, throwSpeedW); //Pair of std::vector<double>
 
     //Convert positions from Carteesian -> Joint Space
     std::vector<double> jThrowPos = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPos.first);
@@ -378,7 +377,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     //Move to start position
     mRTDE_ctrl.moveJ(jThrowPos);
     mRTDE_ctrl.moveJ(jStartPos);
-
+    return;
     //Ready timer
     std::chrono::system_clock::time_point currentTime;
     std::chrono::duration<double> interval(0.00799); // 8 milliseconds -> 125Hz
@@ -389,13 +388,12 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     bool ballReleased = false;
 //    QByteArray response;
 //    QString command = "release(6,250)\n";
-    mRTDE_ctrl.speedStop(20);
+    mRTDE_ctrl.speedStop();
 
 
     //Start the throw
     auto startTime = std::chrono::high_resolution_clock::now();
     auto lastCommandTime = startTime;
-    int count = 0;
     while(true)
     {
         currentTime = std::chrono::high_resolution_clock::now();
@@ -413,7 +411,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
             //Set joints speeds from acceleration * time. (Acceleration limit: 10, stop time: 100ms)
             mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]},40,0.0085);
             lastCommandTime = currentTime;
-            count++;
         }
 
         //Throw 100ms before movement end (gripper delay)
@@ -436,7 +433,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
 
     mRTDE_ctrl.speedStop(15);
-    std::cout << count << std::endl;
 //    mGripperSocket.readAll(); //Empty buffer
 }
 

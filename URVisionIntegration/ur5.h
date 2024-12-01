@@ -64,7 +64,7 @@ private:
 
     //Throw internal methods:
     Eigen::VectorXd getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::Vector3d throwSpeedW);
-    std::pair<std::vector<double>, std::vector<double>> getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW);
+    std::pair<std::vector<double>, std::vector<double>> getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec);
 
 };
 
