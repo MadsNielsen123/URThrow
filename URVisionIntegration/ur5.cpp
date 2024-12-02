@@ -54,27 +54,39 @@ double UR5::R2D(double radians) const
     return (radians*180)/M_PI;
 }
 
-Eigen::Vector3d UR5::world2baseCords(Eigen::Vector3d worldCords) const
+Eigen::Vector3d UR5::world2baseCords(Eigen::Vector3d worldCords, double tilt, double rotation) const
 {
     // Convert 3D coordinates to 4D homogeneous coordinates
     Eigen::Vector4d worldCordsHomo;
     worldCordsHomo << worldCords, 1.0;
 
+    Eigen::Matrix3d RotX, RotZ;
+    //Rotate ~Degrees around X
+    RotX << 1,                  0,                   0,
+               0, cos(D2R(tilt)), -sin(D2R(tilt)),
+               0, sin(D2R(tilt)),  cos(D2R(tilt));
+
+    //Rotate ~Degrees around Z
+    RotZ << cos(D2R(rotation)), -sin(D2R(rotation)), 0,
+            sin(D2R(rotation)),  cos(D2R(rotation)), 0,
+            0,                  0,                 1;
+
+    Eigen::Vector3d TFTCP_T = mT_TFTCP.block<3,1>(0,3);
+    TFTCP_T = (RotZ*RotX) * TFTCP_T;
+
+    Eigen::Matrix4d TFTCP_Rotated = Eigen::Matrix4d::Zero();
+    TFTCP_Rotated << 1 , 0 , 0 , TFTCP_T.x(),
+                     0 , 1 , 0 , TFTCP_T.y(),
+                     0 , 0 , 1 , TFTCP_T.z(),
+                     0 , 0 , 0 , 1;
+
     // Apply the transformations
-    Eigen::Vector4d baseCordsHomo = mT_BW * mT_TFTCP * worldCordsHomo;
+    Eigen::Vector4d baseCordsHomo = mT_BW * TFTCP_Rotated * worldCordsHomo;
 
     // Convert back to 3D by dividing by the homogeneous coordinate
     return baseCordsHomo.head<3>() / baseCordsHomo.w();
 }
 
-Eigen::Vector3d UR5::base2worldCords(Eigen::Vector3d baseCords) const
-{
-    Eigen::Vector4d baseCordsHomo;
-    baseCordsHomo << baseCords, 1.0;
-    Eigen::Vector4d worldCordsHomo = mT_BW * mT_TFTCP * baseCordsHomo;
-
-    return worldCordsHomo.head<3>() / worldCordsHomo.w();
-}
 
 Eigen::Matrix<double, 6, 6> UR5::getJacobean(std::vector<double> jointPos) const
 {
@@ -248,19 +260,12 @@ Eigen::VectorXd UR5::getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::V
     return pseudoinverse * (mR_BW * throwSpeedW);
 }
 
+
+
+
 std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
 {
     std::vector<double> bThrowPos(6), bStartPos(6);
-
-    //Convert to base cordiantes -translation-
-    Eigen::Vector3d throwCordsB = world2baseCords(throwCordsW);
-    Eigen::Vector3d startCordsB = world2baseCords(startCordsW);
-    bThrowPos[0] = throwCordsB(0);
-    bThrowPos[1] = throwCordsB(1);
-    bThrowPos[2] = throwCordsB(2);
-    bStartPos[0] = startCordsB(0);
-    bStartPos[1] = startCordsB(1);
-    bStartPos[2] = startCordsB(2);
 
     //Convert to base cordiantes -orientation-
     double x = speedVec.x();
@@ -287,6 +292,12 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPositi
     bThrowPos[4] = axis(1)*angleAxis.angle();
     bThrowPos[5] = axis(2)*angleAxis.angle();
 
+    //Convert to base cordiantes -translation-
+    Eigen::Vector3d throwCordsB = world2baseCords(throwCordsW, 45, angleDegrees-90);
+    bThrowPos[0] = throwCordsB(0);
+    bThrowPos[1] = throwCordsB(1);
+    bThrowPos[2] = throwCordsB(2);
+
 
     if(y>0)
         T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,-20);
@@ -299,6 +310,13 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPositi
     bStartPos[3] = axis(0)*angleAxis.angle();;
     bStartPos[4] = axis(1)*angleAxis.angle();;
     bStartPos[5] = axis(2)*angleAxis.angle();;
+
+    //Convert to base cordiantes -translation-
+    Eigen::Vector3d startCordsB = world2baseCords(startCordsW, -20, angleDegrees-90);
+    bStartPos[0] = startCordsB(0);
+    bStartPos[1] = startCordsB(1);
+    bStartPos[2] = startCordsB(2);
+
 
     return std::make_pair(bThrowPos, bStartPos);
 }
@@ -358,9 +376,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         // Solve the linear system
         Eigen::VectorXd solution = A.colPivHouseholderQr().solve(B);
 
-//        std::cout << "sol[J" << i << "]: " << std::endl;
-//        std::cout << solution << std::endl;
-
         // Store the coefficients
         a[i] = solution(0);
         b[i] = solution(1);
@@ -368,8 +383,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         d[i] = solution(3);
         e[i] = solution(4);
 
-        //a = {0.0751, 0.2283, 1.1029, -2.3472, 0.1862, 0.2037};
-        //b = {-0.1235, -0.7637, -0.3823, 3.2825, -0.3032, -0.1716};
     }
 
     // --------------------------------------------------------- THROW PART (WORKS) --------------------------------------------------------------------

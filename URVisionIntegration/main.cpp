@@ -12,7 +12,7 @@
 Eigen::Vector3d calSpeed(Eigen::Vector3d throwCords, Eigen::Vector3d targetCords)
 {
     double range = std::sqrt(pow(targetCords.x()-throwCords.x(), 2) + pow(targetCords.y()-throwCords.y(), 2));
-    double g = 9.82;
+    double g = 9.81584;
     double v = std::sqrt((g*pow(range, 2)) / (throwCords.z()-targetCords.z()+range));
     double v_to_vx_angle = std::atan((targetCords.y()-throwCords.y()) / (targetCords.x()-throwCords.x()));
     double tcp_speed_x = v * std::sqrt(2)/2 * std::cos(v_to_vx_angle);
@@ -49,10 +49,10 @@ int main()
 //    if(cupsCords.empty()) //Exit if no cups found
 //        return 1;
 
-    Eigen::Vector3d targetCords = {0.7, 0.45, 0.10};    //Practice cords
+    Eigen::Vector3d targetCords = {0.70, 0.40, 0.10};    //Practice cords
     //Eigen::Vector3d targetCords = cupsCords[0];       //First Cup coords 
-    Eigen::Vector3d throwCords = { 0.35, 0.3, 0.5};
-    Eigen::Vector3d startAccCords = {0.1, 0.1, 0.1};    //These coordinates doesn't matter much. (Only if joint 5 is moving too much)
+    Eigen::Vector3d throwCords = { 0.4, 0.3, 0.2};
+    Eigen::Vector3d startAccCords = {0.1, 0.2, 0.05};    //These coordinates doesn't matter much. (Only if joint 5 is moving too much)
 
 
     //Calculate speed from distance to cup

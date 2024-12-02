@@ -25,8 +25,7 @@ public:
 
     double D2R(double degrees) const;
     double R2D(double radians) const;
-    Eigen::Vector3d world2baseCords(Eigen::Vector3d worldCords) const;
-    Eigen::Vector3d base2worldCords(Eigen::Vector3d baseCords) const;
+    Eigen::Vector3d world2baseCords(Eigen::Vector3d worldCords, double tilt, double rotation) const;
 
     //Jacobean
     Eigen::Matrix<double, 6, 6> getJacobean(std::vector<double> jointPos) const;
@@ -44,7 +43,7 @@ public:
 private:
     // ---------- UR Connection/Control -----------
     //std::string mIP = "192.168.1.54"; //UR
-    std::string mIP = "192.168.0.26"; //UR sim
+    std::string mIP = "192.168.56.101"; //UR sim
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;

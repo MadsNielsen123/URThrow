@@ -161,8 +161,10 @@ std::vector<Eigen::Vector3d> findBalls(cv::Mat& image)
 
         std::vector<cv::Point2f> pixelPoints;
 
-
-        pixelPoints.emplace_back(circles[0][0], circles[0][1]);
+        for (int i = 0; i < circles.size(); i++)
+        {
+            pixelPoints.emplace_back(circles[i][0], circles[i][1]);
+        }
 
         //Transform points to world coordinates
         cv::Matx33f H = cv::Matx33f(-0.008453171254899592 , -0.1027136663102614   , 100.4104391989221,
@@ -241,9 +243,8 @@ std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
 
 
     std::vector<cv::Point2f> pixelPoints;
-    pixelPoints.emplace_back(circles[0][0], circles[0][1]);
 
-    for (int i = 1; i < circles.size(); i++)
+    for (int i = 0; i < circles.size(); i++)
     {
         pixelPoints.emplace_back(circles[i][0], circles[i][1]);
     }
