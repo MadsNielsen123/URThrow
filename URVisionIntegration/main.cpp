@@ -51,8 +51,8 @@ int main()
 
     Eigen::Vector3d targetCords = {0.70, 0.40, 0.10};    //Practice cords
     //Eigen::Vector3d targetCords = cupsCords[0];       //First Cup coords 
-    Eigen::Vector3d throwCords = { 0.4, 0.3, 0.2};
-    Eigen::Vector3d startAccCords = {0.1, 0.2, 0.05};    //These coordinates doesn't matter much. (Only if joint 5 is moving too much)
+    Eigen::Vector3d throwCords = { 0.4, 0.3, 0.3};
+    Eigen::Vector3d startAccCords = {0.1, 0.2, 0.1};    //These coordinates doesn't matter much. (Only if joint 5 is moving too much)
 
 
     //Calculate speed from distance to cup

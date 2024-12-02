@@ -264,7 +264,7 @@ Eigen::VectorXd UR5::getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::V
 
 
 
-std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
+std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowTCPPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
 {
     std::vector<double> bThrowPos(6), bStartPos(6);
 
@@ -322,29 +322,51 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowPositi
     return std::make_pair(bThrowPos, bStartPos);
 }
 
+std::vector<double> UR5::getBaseCarteesianPosition(Eigen::Vector3d pos)
+{
+    std::vector<double> throwCordsB(3);
+
+    // Convert 3D coordinates to 4D homogeneous coordinates
+    Eigen::Vector4d cordsHomo;
+    cordsHomo << pos, 1.0;
+
+    // Apply the transformations
+    Eigen::Vector4d baseCordsHomo = mT_BW * cordsHomo;
+
+    throwCordsB[0] = baseCordsHomo(0);
+    throwCordsB[1] = baseCordsHomo(1);
+    throwCordsB[2] = baseCordsHomo(2);
+
+    return throwCordsB;
+}
+
+
 void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, Eigen::Vector3d startCordsW)
 {
 
-    //Convert from world -> Base frame (with throw orientation)
-    auto baseCartesianThrowStartPos = getBaseStartThrowPosition(throwCordsW, startCordsW, throwSpeedW); //Pair of std::vector<double>
+    //Convert from world coordiantes -> Base frame TCP-pose (with orientation)
+    auto baseCartesianThrowStartPosTF = getBaseStartThrowTCPPosition(throwCordsW, startCordsW, throwSpeedW); //Pair of std::vector<double>
 
     //Convert positions from Carteesian -> Joint Space
-    std::vector<double> jThrowPos = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPos.first);
-    std::vector<double> jStartPos = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPos.second);
+    std::vector<double> jThrowPosTF = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPosTF.first);
+    std::vector<double> jStartPosTF = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPosTF.second);
 
-    std::cout << "Throw: ";
-    for(int i = 0; i<6; ++i)
-    {
-         std::cout << jThrowPos[i] << ", ";
-    }
-    std::cout << std::endl << "Start: ";
-    for(int i = 0; i<6; ++i)
-    {
-        std::cout << jStartPos[i] << ", ";
-    }
-    std::cout << std::endl;
+
+    std::vector<double> baseCartesianThrowPos = getBaseCarteesianPosition(throwCordsW);
+    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[3]);
+    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[4]);
+    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[5]);
+
+    std::vector<double> baseCartesianStartPos = getBaseCarteesianPosition(startCordsW);
+    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[3]);
+    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[4]);
+    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[5]);
+
+    std::vector<double> jThrowPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowPos);
+    std::vector<double> jStartPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianStartPos);
+
     //Calculate joint speeds of throw
-    Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPos, throwSpeedW);
+    Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPosTCP, throwSpeedW);
     std::cout << "JointSpeeds:" << std::endl;
     std::cout << throwJointSpeeds<< std::endl;
 
@@ -368,15 +390,14 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 
         // Create the right-hand side vector
         Eigen::VectorXd B(5);
-        B << jStartPos[i],
-             jThrowPos[i],
+        B << jStartPosTF[i],
+             jThrowPosTF[i],
              0,
              throwJointSpeeds[i],
              0;
 
         // Solve the linear system
         Eigen::VectorXd solution = A.colPivHouseholderQr().solve(B);
-
         // Store the coefficients
         a[i] = solution(0);
         b[i] = solution(1);
@@ -389,9 +410,9 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     // --------------------------------------------------------- THROW PART (WORKS) --------------------------------------------------------------------
 
     //Move to start position
-    mRTDE_ctrl.moveJ(jThrowPos);
-    mRTDE_ctrl.moveJ(jStartPos);
-    return;
+    mRTDE_ctrl.moveJ(jThrowPosTF);
+    mRTDE_ctrl.moveJ(jStartPosTF);
+
     //Ready timer
     std::chrono::system_clock::time_point currentTime;
     std::chrono::duration<double> interval(0.00799); // 8 milliseconds -> 125Hz
