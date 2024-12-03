@@ -56,7 +56,7 @@ int main()
 
 
     //Calculate speed from distance to cup
-    Eigen::Vector3d  throwSpeed = calSpeed(throwCords, targetCords);
+    Eigen::Vector3d  throwSpeed = {0.456437, 0.304291, 0.548568}; //calSpeed(throwCords, targetCords);
     std::cout << throwSpeed << std::endl;
 
     //Throw ball
