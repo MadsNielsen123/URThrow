@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(URVisionIntegration LANGUAGES CXX)
+project(URThrowV1 LANGUAGES CXX)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -31,10 +31,10 @@ find_package(ur_rtde REQUIRED)
 #Eigen
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-add_executable(URVisionIntegration
+add_executable(URThrowV1
   main.cpp
   ur5.h ur5.cpp
   cameraFunctions.h cameraFunctions.cpp
 
 )
-target_link_libraries(URVisionIntegration Qt${QT_VERSION_MAJOR}::Core Qt5::Network ${OpenCV_LIBS}  ${Pylon_LIBRARIES} ur_rtde::rtde Eigen3::Eigen)
+target_link_libraries(URThrowV1 Qt${QT_VERSION_MAJOR}::Core Qt5::Network ${OpenCV_LIBS}  ${Pylon_LIBRARIES} ur_rtde::rtde Eigen3::Eigen)

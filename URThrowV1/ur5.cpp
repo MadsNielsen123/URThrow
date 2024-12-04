@@ -33,14 +33,14 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 
-//    //Initialize gripper
-//    mGripperSocket.connectToHost("192.168.1.20", 1000);
-//    if(!mGripperSocket.waitForConnected(5000))
-//    {
-//        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-//    }
+    //Initialize gripper
+    mGripperSocket.connectToHost("192.168.1.20", 1000);
+    if(!mGripperSocket.waitForConnected(5000))
+    {
+        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+    }
 
-//    gripper_home();
+    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -86,7 +86,6 @@ Eigen::Vector3d UR5::world2baseCords(Eigen::Vector3d worldCords, double tilt, do
     // Convert back to 3D by dividing by the homogeneous coordinate
     return baseCordsHomo.head<3>() / baseCordsHomo.w();
 }
-
 
 Eigen::Matrix<double, 6, 6> UR5::getJacobean(std::vector<double> jointPos) const
 {
@@ -265,9 +264,6 @@ Eigen::VectorXd UR5::getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::V
     return pseudoinverse * (mR_BW * throwSpeedW);
 }
 
-
-
-
 std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowTCPPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
 {
     std::vector<double> bThrowPos(6), bStartPos(6);
@@ -415,51 +411,50 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     // --------------------------------------------------------- THROW PART (WORKS) --------------------------------------------------------------------
 
     //Move to start position
-    mRTDE_ctrl.moveJ(jThrowPosTCP);
     mRTDE_ctrl.moveJ(jThrowPosTF);
-
-    mRTDE_ctrl.moveJ(jStartPosTCP);
-
     mRTDE_ctrl.moveJ(jStartPosTF);
 
 
-    std::cout << "ThrowTCP: \n";
-    for(int i = 0; i<6; i++)
-    {
-        std::cout << jThrowPosTCP[i] << " " ;
-    }
-    std::cout << std::endl;
-    std::cout << "StartTCP: \n";
-    for(int i = 0; i<6; i++)
-    {
-        std::cout << jStartPosTCP[i] << " " ;
-    }
-    std::cout << std::endl;
-    std::cout << "ThrowTF: \n";
-    for(int i = 0; i<6; i++)
-    {
-        std::cout << jThrowPosTF[i] << " " ;
-    }
-    std::cout << std::endl;
-    std::cout << "StartTF: \n";
-    for(int i = 0; i<6; i++)
-    {
-        std::cout << jStartPosTF[i] << " " ;
-    }
-    std::cout << std::endl;
+//    std::cout << "ThrowTCP: \n";
+//    for(int i = 0; i<6; i++)
+//    {
+//        std::cout << jThrowPosTCP[i] << " " ;
+//    }
+//    std::cout << std::endl;
+//    std::cout << "StartTCP: \n";
+//    for(int i = 0; i<6; i++)
+//    {
+//        std::cout << jStartPosTCP[i] << " " ;
+//    }
+//    std::cout << std::endl;
+//    std::cout << "ThrowTF: \n";
+//    for(int i = 0; i<6; i++)
+//    {
+//        std::cout << jThrowPosTF[i] << " " ;
+//    }
+//    std::cout << std::endl;
+//    std::cout << "StartTF: \n";
+//    for(int i = 0; i<6; i++)
+//    {
+//        std::cout << jStartPosTF[i] << " " ;
+//    }
+//    std::cout << std::endl;
 
     //Ready timer
     std::chrono::system_clock::time_point currentTime;
-    std::chrono::duration<double> interval(0.00799); // 8 milliseconds -> 125Hz
+    std::chrono::duration<double> interval(0.0079999); // 8 milliseconds -> 125Hz
+
     double t;
 
     //Ready throw
     std::vector<double> jointVelocity(6);
     bool ballReleased = false;
-//    QByteArray response;
-//    QString command = "release(6,250)\n";
+    QByteArray response;
+    QString command = "release(6,250)\n";
     mRTDE_ctrl.speedStop();
 
+    int commandCount = 0;
+    std::vector<double> previousTarget = {0,0,0,0,0,0};
 
     //Start the throw
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -473,21 +468,39 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
         //Send speedJ commands with 125Hz
         if(currentTime - lastCommandTime >= interval)
         {
+            commandCount++;
             for(int i= 0; i<6; ++i)
-            {           
-                    jointVelocity[i] = 4*a[i]*(t*t*t) + 3*b[i]*(t*t)+ 2*c[i]*t + d[i];
+            {
+                    double tn = t+interval.count(); //t-next
+                    jointVelocity[i] = 4*a[i]*(tn*tn*tn) + 3*b[i]*(tn*tn)+ 2*c[i]*tn + d[i];
             }
 
-            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]}, 40, 0.0085);
+            mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]}, 40, 0.008);
             lastCommandTime = currentTime;
+
+            std::cout << "=====================================================================================================" << std::endl;
+
+            std::cout << "Command Nr:" << commandCount << " | Time: " << t << "[s]" << std::endl;
+            std::cout << "Actual Speed: ";
+            std::vector<double> actualSpeeds = mRTDE_recv.getActualQd();
+            for(int i = 0; i<6; ++i)
+            {
+                std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
+            }
+            std::cout << " | Next Target Speeed: ";
+            for(int i = 0; i<6; ++i)
+            {
+                std::cout << std::fixed << std::setprecision(8) << jointVelocity[i] << " ";
+            }
+
         }
 
         //Throw 100ms before movement end (gripper delay)
         if(t >= T-0.1 && !ballReleased)
         {
-//            mGripperSocket.write(command.toUtf8()); //Send throw command
-//            if(!mGripperSocket.waitForReadyRead(1000))
-//                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
+            mGripperSocket.write(command.toUtf8()); //Send throw command
+            if(!mGripperSocket.waitForReadyRead(1000))
+                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
             ballReleased = true;         
 
         }
@@ -501,8 +514,32 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     }
 
 
-    mRTDE_ctrl.speedStop(15);
-//    mGripperSocket.readAll(); //Empty buffer
+    std::cout << std::endl << "========================================================================================" << std::endl;
+    std::cout << "======================================= THROW FINISHED =================================" << std::endl;
+    std::cout <<  "========================================================================================"<< std::endl;
+    std::cout << "Actual Speed: ";
+    std::vector<double> actualSpeeds = mRTDE_recv.getActualQd();
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
+    }
+
+    std::cout << std::endl << "END Target Speed: ";
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << throwJointSpeeds[i] << " ";
+    }
+
+    std::cout << std::endl;
+    mRTDE_ctrl.speedStop(8);
+    mGripperSocket.readAll(); //Empty buffer
+
+    std::cout << "Difference: ";
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << throwJointSpeeds[i]-actualSpeeds[i] << " ";
+    }
+    std::cout << std::endl;
 }
 
 
