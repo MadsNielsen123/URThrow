@@ -42,8 +42,8 @@ public:
 
 private:
     // ---------- UR Connection/Control -----------
-    //std::string mIP = "192.168.1.54"; //UR
-    std::string mIP = "192.168.0.26"; //UR sim
+    std::string mIP = "192.168.1.54"; //UR
+    //std::string mIP = "192.168.0.26"; //UR sim
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;
@@ -63,7 +63,7 @@ private:
 
     //Throw internal methods:
     Eigen::VectorXd getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::Vector3d throwSpeedW);
-    std::pair<std::vector<double>, std::vector<double>> getBaseStartThrowTCPPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec);
+    std::pair<std::vector<double>, std::vector<double>> getBaseStartThrowTFPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec);
     std::vector<double> getBaseCarteesianPosition(Eigen::Vector3d pos);
 };
 

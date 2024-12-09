@@ -6,7 +6,7 @@
 
 UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 {
-    // mRTDE_ctrl.setWatchdog(0.0043); //Acknowledge time for the robot (Frequency)
+    mRTDE_ctrl.setWatchdog(0.0043); //Acknowledge time for the robot (Frequency)
 
     //Precice SVD (Not othogonal though)
     mT_BW << 0.3843,   0.932,  -0.0001, -0.1151,
@@ -34,13 +34,13 @@ UR5::UR5() : mRTDE_ctrl(mIP), mRTDE_IO(mIP), mRTDE_recv(mIP)
 
 
 //    //Initialize gripper
-//    mGripperSocket.connectToHost("192.168.1.20", 1000);
-//    if(!mGripperSocket.waitForConnected(5000))
-//    {
-//        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
-//    }
+    mGripperSocket.connectToHost("192.168.1.20", 1000);
+    if(!mGripperSocket.waitForConnected(5000))
+    {
+        qDebug() << "Connection Failed: " << mGripperSocket.errorString();
+    }
 
-//    gripper_home();
+    gripper_home();
 
     moveJ({D2R(-90.92), D2R(-89.66), D2R(-134.22), D2R(-46.09), D2R(90.01), D2R( -23.47)}); //Start in default location (world 0,0,0)
 }
@@ -264,27 +264,21 @@ Eigen::VectorXd UR5::getThrowJointSpeeds(std::vector<double> jThrowPos, Eigen::V
     return pseudoinverse * (mR_BW * throwSpeedW);
 }
 
-std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowTCPPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
+std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowTFPosition(Eigen::Vector3d throwCordsW, Eigen::Vector3d startCordsW, Eigen::Vector3d speedVec)
 {
     std::vector<double> bThrowPos(6), bStartPos(6);
 
     //Convert to base cordiantes -orientation-
     double x = speedVec.x();
     double y = speedVec.y();
-    double magnitude = std::sqrt(x * x + y * y);
-    double cosTheta = x / magnitude;
-    cosTheta = std::max(-1.0, std::min(1.0, cosTheta)); // Clamp the value to the range [-1, 1] to handle numerical precision issues
 
     // Compute the angle
-    double angle = std::acos(cosTheta);
+    double angle = atan2(y,x);
     double angleDegrees = angle * (180.0 / M_PI);
 
     Eigen::Matrix4d T_BTCP;
 
-    if(y>0)
-        T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,45);
-    else
-        T_BTCP = mT_BW*getT_World2TCP(-angleDegrees-90,45);
+    T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,45);
 
     Eigen::AngleAxisd angleAxis(T_BTCP.block<3,3>(0,0));
     Eigen::Vector3d axis = angleAxis.axis();
@@ -299,11 +293,7 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowTCPPos
     bThrowPos[1] = throwCordsB(1);
     bThrowPos[2] = throwCordsB(2);
 
-
-    if(y>0)
-        T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,-20);
-    else
-        T_BTCP = mT_BW*getT_World2TCP(-angleDegrees-90,-20);
+    T_BTCP = mT_BW*getT_World2TCP(angleDegrees-90,-20);
 
     angleAxis = T_BTCP.block<3,3>(0,0);
     axis = angleAxis.axis();
@@ -345,25 +335,25 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 {
 
     //Convert from world coordiantes -> Base frame TCP-pose (with orientation)
-    auto baseCartesianThrowStartPosTF = getBaseStartThrowTCPPosition(throwCordsW, startCordsW, throwSpeedW); //Pair of std::vector<double>
+    auto baseCartesianThrowStartPosTF = getBaseStartThrowTFPosition(throwCordsW, startCordsW, throwSpeedW); //Pair of std::vector<double>
 
     //Convert positions from Carteesian -> Joint Space
     std::vector<double> jThrowPosTF = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPosTF.first);
     std::vector<double> jStartPosTF = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPosTF.second);
 
 
-    std::vector<double> baseCartesianThrowPos = getBaseCarteesianPosition(throwCordsW);
-    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[3]);
-    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[4]);
-    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[5]);
+//    std::vector<double> baseCartesianThrowPos = getBaseCarteesianPosition(throwCordsW);
+//    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[3]);
+//    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[4]);
+//    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[5]);
 
-    std::vector<double> baseCartesianStartPos = getBaseCarteesianPosition(startCordsW);
-    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[3]);
-    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[4]);
-    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[5]);
+//    std::vector<double> baseCartesianStartPos = getBaseCarteesianPosition(startCordsW);
+//    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[3]);
+//    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[4]);
+//    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[5]);
 
-    std::vector<double> jThrowPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowPos);
-    std::vector<double> jStartPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianStartPos);
+    //std::vector<double> jThrowPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowPos);
+    //std::vector<double> jStartPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianStartPos);
 
     //Calculate joint speeds of throw
     Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPosTF, throwSpeedW);
@@ -478,29 +468,29 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
             mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]}, 15, 0.008);
             lastCommandTime = currentTime;
 
-            std::cout << "=====================================================================================================" << std::endl;
+//            std::cout << "=====================================================================================================" << std::endl;
 
-            std::cout << "Command Nr:" << commandCount << " | Time: " << t << "[s]" << std::endl;
-            std::cout << "Actual Speed: ";
-            std::vector<double> actualSpeeds = mRTDE_recv.getActualQd();
-            for(int i = 0; i<6; ++i)
-            {
-                std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
-            }
-            std::cout << " | Next Target Speeed: ";
-            for(int i = 0; i<6; ++i)
-            {
-                std::cout << std::fixed << std::setprecision(8) << jointVelocity[i] << " ";
-            }
-            std::cout << std::endl;
+//            std::cout << "Command Nr:" << commandCount << " | Time: " << t << "[s]" << std::endl;
+//            std::cout << "Actual Speed: ";
+//            std::vector<double> actualSpeeds = mRTDE_recv.getActualQd();
+//            for(int i = 0; i<6; ++i)
+//            {
+//                std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
+//            }
+//            std::cout << " | Next Target Speeed: ";
+//            for(int i = 0; i<6; ++i)
+//            {
+//                std::cout << std::fixed << std::setprecision(8) << jointVelocity[i] << " ";
+//            }
+//            std::cout << std::endl;
         }
 
-        //Throw 100ms before movement end (gripper delay)
-        if(t >= T-0.1 && !ballReleased)
+        //Throw 90ms before movement end (gripper delay)
+        if(t >= T-0.08 && !ballReleased)
         {
-//            mGripperSocket.write(command.toUtf8()); //Send throw command
-//            if(!mGripperSocket.waitForReadyRead(1000))
-//                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
+            mGripperSocket.write(command.toUtf8()); //Send throw command
+            if(!mGripperSocket.waitForReadyRead(1000))
+                qDebug() << "Couldn't read ack " << mGripperSocket.errorString();
             ballReleased = true;         
 
         }
@@ -521,13 +511,15 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     std::vector<double> actualSpeeds = mRTDE_recv.getActualQd();
     std::vector<double> actualPosition = mRTDE_recv.getActualQ();
 
-    mRTDE_ctrl.speedStop(20);
+    mRTDE_ctrl.speedStop(10);
+    mGripped = false;
+
 //    mGripperSocket.readAll(); //Empty buffer
-//    std::cout << "Actual Speed: ";
-//    for(int i = 0; i<6; ++i)
-//    {
-//        std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
-//    }
+    std::cout << "Actual Speed: ";
+    for(int i = 0; i<6; ++i)
+    {
+        std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
+    }
 
 //    std::cout << std::endl << "END Target Speed: ";
 //    for(int i = 0; i<6; ++i)

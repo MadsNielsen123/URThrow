@@ -28,49 +28,53 @@ int main()
 
     UR5 UR;
 
-//    //Find coordinates of balls and cups
-//    cv::Mat picture = takePicture();
-//    cv::imshow("Picture", picture);
-//    //cv::waitKey(0);
-//    std::vector<Eigen::Vector3d> ballCords = findBalls(picture);
+    //Find coordinates of balls and cups
+    cv::Mat picture = takePicture();
+    std::vector<Eigen::Vector3d> ballCords = findBalls(picture);
+    std::vector<Eigen::Vector3d> cupsCords = findCups(picture);
+    cv::imshow("Balls and cups", picture);
 
+    if(ballCords.empty()) //Exit if no ball found
+    {
+        std::cout << "NO BALL" << std::endl;
+        return 1;
+    }
 
-//    if(ballCords.empty()) //Exit if no ball found
-//    {
-//        std::cout << "NO BALL" << std::endl;
-//        return 1;
-//    }
+    if(cupsCords.empty()) //Exit if no ball found
+    {
+        std::cout << "NO CUP" << std::endl;
+        return 1;
+    }
 
+    //Throw all balls
+    for(int i = 0; i< std::max(ballCords.size(), cupsCords.size()); ++i)
+    {
+        UR.moveL(ballCords[i].x(), ballCords[i].y(), 0.05, 0, 0); //Move over ball
 
+        //Grab ball
+        UR.moveL(ballCords[i], 0, 0);
+        UR.gripper_gripBall();
 
-//    UR.moveL(ballCords[0].x(), ballCords[0].y(), 0.05, 0, 0); //Move over ball
+        Eigen::Vector3d targetCords = cupsCords[i];//First Cup coords
+        int centerDirection = 1;
+        if(cupsCords[i].y()>0.25)
+            centerDirection = -1;
 
-//    //Grab ball
-//    UR.moveL(ballCords[0], 0, 0);
-//    UR.gripper_gripBall();
+        Eigen::Vector3d throwCords = { 0.40, cupsCords[i].y()+0.05*centerDirection, 0.3};
+        Eigen::Vector3d startAccCords = {0.15, 0.2, 0.15};    //These coordinates doesn't matter much. (Only if joint 5 is moving too much)
 
-//    std::vector<Eigen::Vector3d> cupsCords = findCups(picture);
-//    if(cupsCords.empty()) //Exit if no ball found
-//    {
-//        std::cout << "NO CUP" << std::endl;
-//        return 1;
-//    }
+        //Calculate speed from distance to cup
+        Eigen::Vector3d  throwSpeed = calSpeed(throwCords, targetCords);
+        std::cout << "Distance = " << cupsCords[i].x()-throwCords.x() << std::endl;
+        throwSpeed.x() *= 1.20;
+        throwSpeed.y() *= 1.20;
+        UR.throwFixed(throwCords, throwSpeed, startAccCords);
 
-    // ---------------- Shoot at first cup -------------
+        sleep(1);
+    }
 
+    //Eigen::Vector3d targetCords = {0.71, 0.30, 0.11};    //Practice cords
 
-    Eigen::Vector3d targetCords = {0.71, 0.40, 0.11};    //Practice cords
-    //Eigen::Vector3d targetCords = cupsCords[0];       //First Cup coords
-    Eigen::Vector3d throwCords = { 0.35, 0.25, 0.3};
-    Eigen::Vector3d startAccCords = {0.1, 0.2, 0.15};    //These coordinates doesn't matter much. (Only if joint 5 is moving too much)
-
-
-    //Calculate speed from distance to cup
-    Eigen::Vector3d  throwSpeed = calSpeed(throwCords, targetCords);
-    std::cout << throwSpeed << std::endl;
-
-    //Throw ball
-    UR.throwFixed(throwCords, throwSpeed, startAccCords);
     return 0;
 }
 

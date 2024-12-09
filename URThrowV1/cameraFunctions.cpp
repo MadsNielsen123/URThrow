@@ -122,9 +122,14 @@ std::vector<Eigen::Vector3d> findBalls(cv::Mat& image)
 
 
         //GrayImage
-        cv::Mat grayImage;
-        cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+        std::vector<cv::Mat> channels(3);
+        cv::split(image, channels);
+        cv::Mat grayImage = channels[1];
 
+        //cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+
+
+        cv::imshow("Bolde", grayImage);
         //smoothing
         cv::GaussianBlur(grayImage, grayImage, cv::Size(3, 3), 0, 0);
 
@@ -135,19 +140,20 @@ std::vector<Eigen::Vector3d> findBalls(cv::Mat& image)
         HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1, ballDistance, 100, 30, minRadiusBall, maxRadiusBall);
 
         if(circles.size() < 1)
-            std::cout << "Fandt ingen bolde";
+            std::cout << "Fandt ingen bolde" << std::endl;
 
+
+        //Draw balls
         for (size_t i = 0; i < circles.size(); i++)
         {
             cv::Vec3i c = circles[i];
             cv::Point center = cv::Point(c[0], c[1]);
             // circle center
-            circle(image, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
+            circle(image, center, 1, cv::Scalar(0, 0, 255), 3, cv::LINE_AA);
             // circle outline
             int radius = c[2];
-            circle(image, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+            circle(image, center, radius, cv::Scalar(0, 0, 255), 3, cv::LINE_AA);
         }
-
 
         //indsæt de koordinater vi får fra billedgenkendelse i billed planet her? ------------------
 
@@ -211,7 +217,7 @@ std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
     //Hough Detection
     int cupdistance = grayImage.rows / 16; // change this value to detect circles with different distances to each other
     std::vector<cv::Vec3f> circles;
-    HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1, cupdistance, 100, 30, minRadiusCup, minRadiusCup );
+    HoughCircles(grayImage, circles, cv::HOUGH_GRADIENT, 1, cupdistance, 100, 30, minRadiusCup, maxRadiusCup);
 
     if(circles.size() < 1)
         std::cout << "Fandt inge cups";
@@ -220,24 +226,23 @@ std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
     std::vector<cv::Vec3f> filteredCircles;
     for (int i = 0; i < circles.size(); i++)
     {
-        if (circles[i][0] > 380 && circles[i][0] < 1030 && circles[i][1] > 380 && circles[i][1] < 700)//lower final value for cups further towards robot
+        if (circles[i][0] > 380 && circles[i][0] < 1030 && circles[i][1] < 700)//lower final value for cups further towards robot
             filteredCircles.emplace_back(circles[i]);
     }
 
     circles = filteredCircles;
 
+    //Draw in circles
     for (size_t i = 0; i < circles.size(); i++)
     {
         cv::Vec3i c = circles[i];
         cv::Point center = cv::Point(c[0], c[1]);
         // circle center
-        circle(image, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
+        circle(image, center, 1, cv::Scalar(255, 0, 0), 3, cv::LINE_AA);
         // circle outline
         int radius = c[2];
-        circle(image, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+        circle(image, center, radius, cv::Scalar(255, 0, 0), 3, cv::LINE_AA);
     }
-
-
     //sort circles by radius
     std::sort(circles.begin(), circles.end(), [](cv::Vec3f& a, cv::Vec3f& b){return a[2] < b[2];});
 
@@ -272,7 +277,7 @@ std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
         realWorldTransformedPoints[i].y *= 0.01;
 
         //Save point as Eigen 3D-vector
-        coordinates.push_back({realWorldTransformedPoints[i].x, realWorldTransformedPoints[i].y, 0.1}); //cup height: 10 cm heigh
+        coordinates.push_back({realWorldTransformedPoints[i].x, realWorldTransformedPoints[i].y, 0.11}); //cup height: 11 cm heigh
 
     }
 
