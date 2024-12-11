@@ -43,7 +43,8 @@ public:
 private:
     // ---------- UR Connection/Control -----------
     std::string mIP = "192.168.1.54"; //UR
-    //std::string mIP = "192.168.0.26"; //UR sim
+    //std::string mIP = "192.168.56.101"; //UR sim Laptop
+    //std::string mIP = "192.168.1.26"; //UR sim Desktop
 
     ur_rtde::RTDEControlInterface mRTDE_ctrl;
     ur_rtde::RTDEIOInterface mRTDE_IO;

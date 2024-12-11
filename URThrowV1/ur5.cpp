@@ -312,23 +312,23 @@ std::pair<std::vector<double>, std::vector<double>> UR5::getBaseStartThrowTFPosi
     return std::make_pair(bThrowPos, bStartPos);
 }
 
-std::vector<double> UR5::getBaseCarteesianPosition(Eigen::Vector3d pos)
-{
-    std::vector<double> throwCordsB(3);
+//std::vector<double> UR5::getBaseCarteesianPosition(Eigen::Vector3d pos)
+//{
+//    std::vector<double> throwCordsB(3);
 
-    // Convert 3D coordinates to 4D homogeneous coordinates
-    Eigen::Vector4d cordsHomo;
-    cordsHomo << pos, 1.0;
+//    // Convert 3D coordinates to 4D homogeneous coordinates
+//    Eigen::Vector4d cordsHomo;
+//    cordsHomo << pos, 1.0;
 
-    // Apply the transformations
-    Eigen::Vector4d baseCordsHomo = mT_BW * cordsHomo;
+//    // Apply the transformations
+//    Eigen::Vector4d baseCordsHomo = mT_BW * cordsHomo;
 
-    throwCordsB[0] = baseCordsHomo(0);
-    throwCordsB[1] = baseCordsHomo(1);
-    throwCordsB[2] = baseCordsHomo(2);
+//    throwCordsB[0] = baseCordsHomo(0);
+//    throwCordsB[1] = baseCordsHomo(1);
+//    throwCordsB[2] = baseCordsHomo(2);
 
-    return throwCordsB;
-}
+//    return throwCordsB;
+//}
 
 
 void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, Eigen::Vector3d startCordsW)
@@ -341,24 +341,10 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     std::vector<double> jThrowPosTF = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPosTF.first);
     std::vector<double> jStartPosTF = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowStartPosTF.second);
 
-
-//    std::vector<double> baseCartesianThrowPos = getBaseCarteesianPosition(throwCordsW);
-//    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[3]);
-//    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[4]);
-//    baseCartesianThrowPos.push_back(baseCartesianThrowStartPosTF.first[5]);
-
-//    std::vector<double> baseCartesianStartPos = getBaseCarteesianPosition(startCordsW);
-//    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[3]);
-//    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[4]);
-//    baseCartesianStartPos.push_back(baseCartesianThrowStartPosTF.second[5]);
-
-    //std::vector<double> jThrowPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianThrowPos);
-    //std::vector<double> jStartPosTCP = mRTDE_ctrl.getInverseKinematics(baseCartesianStartPos);
-
     //Calculate joint speeds of throw
     Eigen::VectorXd throwJointSpeeds = getThrowJointSpeeds(jThrowPosTF, throwSpeedW);
-    std::cout << "JointSpeeds:" << std::endl;
-    std::cout << throwJointSpeeds<< std::endl;
+//    std::cout << "JointSpeeds:" << std::endl;
+//    std::cout << throwJointSpeeds<< std::endl;
 
     // --------------------------------------------------------- CALCULATE ACCERLATION AND ACCLERATION START TIME  --------------------------------------------------------------------
 
@@ -403,32 +389,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     //Move to start position
     mRTDE_ctrl.moveJ(jThrowPosTF);
     mRTDE_ctrl.moveJ(jStartPosTF);
-
-
-//    std::cout << "ThrowTCP: \n";
-//    for(int i = 0; i<6; i++)
-//    {
-//        std::cout << jThrowPosTCP[i] << " " ;
-//    }
-//    std::cout << std::endl;
-//    std::cout << "StartTCP: \n";
-//    for(int i = 0; i<6; i++)
-//    {
-//        std::cout << jStartPosTCP[i] << " " ;
-//    }
-//    std::cout << std::endl;
-//    std::cout << "ThrowTF: \n";
-//    for(int i = 0; i<6; i++)
-//    {
-//        std::cout << jThrowPosTF[i] << " " ;
-//    }
-//    std::cout << std::endl;
-//    std::cout << "StartTF: \n";
-//    for(int i = 0; i<6; i++)
-//    {
-//        std::cout << jStartPosTF[i] << " " ;
-//    }
-//    std::cout << std::endl;
 
     //Ready timer
     std::chrono::system_clock::time_point currentTime;
@@ -483,6 +443,8 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 //                std::cout << std::fixed << std::setprecision(8) << jointVelocity[i] << " ";
 //            }
 //            std::cout << std::endl;
+
+//            std::cout << "SpeedSlider: " << mRTDE_recv.getTargetSpeedFraction() << std::endl;
         }
 
         //Throw 90ms before movement end (gripper delay)
@@ -504,9 +466,9 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     }
 
 
-    std::cout << std::endl << "========================================================================================" << std::endl;
-    std::cout << "======================================= THROW FINISHED =================================" << std::endl;
-    std::cout <<  "========================================================================================"<< std::endl;
+//    std::cout << std::endl << "========================================================================================" << std::endl;
+//    std::cout << "======================================= THROW FINISHED =================================" << std::endl;
+//    std::cout <<  "========================================================================================"<< std::endl;
 
     std::vector<double> actualSpeeds = mRTDE_recv.getActualQd();
     std::vector<double> actualPosition = mRTDE_recv.getActualQ();
@@ -515,11 +477,11 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     mGripped = false;
 
 //    mGripperSocket.readAll(); //Empty buffer
-    std::cout << "Actual Speed: ";
-    for(int i = 0; i<6; ++i)
-    {
-        std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
-    }
+//    std::cout << "Actual Speed: ";
+//    for(int i = 0; i<6; ++i)
+//    {
+//        std::cout << std::fixed << std::setprecision(8) << actualSpeeds[i] << " ";
+//    }
 
 //    std::cout << std::endl << "END Target Speed: ";
 //    for(int i = 0; i<6; ++i)
@@ -527,16 +489,16 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 //        std::cout << throwJointSpeeds[i] << " ";
 //    }
 
-    double diff, totalDiff = 0;
-    std::cout << std::endl << "Difference speed(): ";
-    for(int i = 0; i<6; ++i)
-    {
-        diff = throwJointSpeeds[i]-actualSpeeds[i];
-        std::cout << diff << " ";
-        totalDiff += abs(diff);
-    }
+//    double diff, totalDiff = 0;
+//    std::cout << std::endl << "Difference speed(): ";
+//    for(int i = 0; i<6; ++i)
+//    {
+//        diff = throwJointSpeeds[i]-actualSpeeds[i];
+//        std::cout << diff << " ";
+//        totalDiff += abs(diff);
+//    }
 
-    std::cout << " | Total diff = " << totalDiff << std::endl;
+//    std::cout << " | Total diff = " << totalDiff << std::endl;
 
 //    std::vector<double> actualPosition = mRTDE_recv.getActualQd();
 //    for(int i = 0; i<6; ++i)
@@ -550,16 +512,16 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
 //        std::cout << jEndPosTF[i] << " ";
 //    }
 
-    std::cout << std::endl << "Difference (pos): ";
-    totalDiff = 0;
-    for(int i = 0; i<6; ++i)
-    {
-        diff = jThrowPosTF[i]-actualPosition[i];
-        std::cout << diff << " ";
-        totalDiff += abs(diff);
-    }
+//    std::cout << std::endl << "Difference (pos): ";
+//    totalDiff = 0;
+//    for(int i = 0; i<6; ++i)
+//    {
+//        diff = jThrowPosTF[i]-actualPosition[i];
+//        std::cout << diff << " ";
+//        totalDiff += abs(diff);
+//    }
 
-    std::cout << " | Total diff = " << totalDiff << std::endl;
+//    std::cout << " | Total diff = " << totalDiff << std::endl;
 }
 
 

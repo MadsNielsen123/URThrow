@@ -210,7 +210,8 @@ std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
     //GrayImage
     cv::Mat grayImage;
     cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
-
+    cv::imshow("Found this: ", grayImage);
+    cv::waitKey(0);
     //smoothing
     cv::GaussianBlur(grayImage, grayImage, cv::Size(3, 3), 0, 0);
 
@@ -243,6 +244,10 @@ std::vector<Eigen::Vector3d> findCups(cv::Mat& image)
         int radius = c[2];
         circle(image, center, radius, cv::Scalar(255, 0, 0), 3, cv::LINE_AA);
     }
+
+    cv::imshow("Found this: ", grayImage);
+    cv::waitKey(0);
+
     //sort circles by radius
     std::sort(circles.begin(), circles.end(), [](cv::Vec3f& a, cv::Vec3f& b){return a[2] < b[2];});
 
