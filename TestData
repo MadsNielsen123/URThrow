@@ -1,4 +1,4 @@
-scalar, Distance, x, y, z, succesiveThrow
+scalar, distance, x, y, z, succesiveThrow
 
 1.2, 0.273627, 0.673674, 0.451807, 0.11, 6
 1.2, 0.272287, 0.672287, 0.351264, 0.11, 6
