@@ -418,7 +418,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     mRTDE_ctrl.moveJ(jThrowPosTF);
     mRTDE_ctrl.moveJ(jStartPosTF);
 
-
 //    std::cout << "ThrowTCP: \n";
 //    for(int i = 0; i<6; i++)
 //    {
@@ -448,7 +447,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     std::chrono::system_clock::time_point currentTime;
     std::chrono::duration<double> interval(0.008); // 8 milliseconds -> 125Hz
 
-    double t;
+    double t = 0;
 
     //Ready throw
     std::vector<double> jointVelocity(6);
@@ -467,8 +466,6 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
     actualSpeeds.push_back(mRTDE_recv.getActualQd());
     actualTimes.push_back(t);
     speedFrac.push_back(mRTDE_recv.getTargetSpeedFraction());
-
-    std::vector<double> previousTarget = {0,0,0,0,0,0};
 
     // --------------------------------------- Start the throw -----
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -501,7 +498,7 @@ void UR5::throwFixed(Eigen::Vector3d throwCordsW, Eigen::Vector3d throwSpeedW, E
             mRTDE_ctrl.speedJ({jointVelocity[0], jointVelocity[1], jointVelocity[2], jointVelocity[3], jointVelocity[4], jointVelocity[5]}, 15, 0.008);
             lastCommandTime = currentTime;
 
-            targetSpeed.push_back(mRTDE_recv.getActualQ());
+            targetSpeed.push_back(tSpeed);
             actualSpeeds.push_back(mRTDE_recv.getActualQd());
             actualTimes.push_back(t);
             speedFrac.push_back(mRTDE_recv.getTargetSpeedFraction());
